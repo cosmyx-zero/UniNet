@@ -1,0 +1,25 @@
+# UniNet runtime configuration. Environment variables (UNINET_*) override these.
+bus: inproc                     # inproc | kafka
+kafka_brokers: localhost:9092
+kafka_topic: uninet.flows.oneway
+
+window_seconds: 300             # processing window for features + TB-Graph
+                                # (long enough to observe several beacon intervals)
+burst_gap_seconds: 2.0         # idle gap (s) that terminates a traffic burst
+min_bursts_for_periodicity: 3  # need >= N bursts before scoring beaconing
+min_flows_per_window: 4        # skip assessment for near-idle host windows
+
+alert_threshold: 0.5           # minimum fused confidence to emit an alert
+
+# Evidence-fusion weights (rule / anomaly / graph). Rescaled to sum to 1.
+fusion_weights:
+  rule: 0.5
+  anomaly: 0.2
+  graph: 0.3
+
+model_dir: models
+anomaly_model: anomaly_isoforest.joblib
+rgat_model: rgat.pt
+
+api_host: 127.0.0.1
+api_port: 8000
