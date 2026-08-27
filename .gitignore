@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Models & data artifacts (provenance tracked in models/README.md)
+models/*.pt
+models/*.pth
+models/*.joblib
+models/*.pkl
+data/raw/**
+data/processed/**
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/samples/**
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env / editors
+.env
+.idea/
+.vscode/

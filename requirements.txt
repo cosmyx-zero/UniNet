@@ -1,0 +1,16 @@
+# Core runtime (Phase 1 + Phase 2 fallback path). Install with:  pip install -r requirements.txt
+numpy>=1.24
+scikit-learn>=1.3
+pydantic>=2.5
+networkx>=3.1
+flask>=3.0
+pyyaml>=6.0
+joblib>=1.3
+rich>=13.0
+
+# Optional extras (install as needed):
+#   pip install -e ".[pcap]"    -> scapy (live/offline PCAP ingestion)
+#   pip install -e ".[stream]"  -> kafka-python (one-way Kafka bus)
+#   pip install -e ".[ml]"      -> torch + torch-geometric (real RGAT model)
+#   pip install -e ".[data]"    -> pandas (TII-SSRC-23 dataset loader)
+#   pip install -e ".[dev]"     -> pytest + ruff
