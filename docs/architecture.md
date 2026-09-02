@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # UniNet architecture (Phases 1, 2, 5)
-=======
-# UniNet architecture (Phase 1 + Phase 2)
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
 ```
  one-way tap / data diode
@@ -22,7 +18,6 @@
                              edges: emits, burst_in/out, direction_change, periodic, resolves
           │
           ▼
-<<<<<<< HEAD
    detection/                rules (statistical)                       ┐
                              anomaly_model (IsoForest / baseline)      ├─ evidence
                              rgat_model (RGAT │ heuristic graph)       │   fusion ─► Alert
@@ -39,19 +34,6 @@
 Sequence model is **additive evidence only** — it never changes the fused
 confidence or the chosen threat class.
 
-=======
-   detection/                rules (statistical)  ┐
-                             anomaly_model (IsoForest / baseline)  ├─ evidence fusion ─► Alert
-                             rgat_model (RGAT │ heuristic graph)   ┘
-          │
-          ▼
-   api/app.py                Flask: /api/alerts /api/graph /api/explain  + dashboard
-          │
-          ▼
-   explainability/ , assistant/   (Phase 3 / 4 — read-only)
-```
-
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 ## Windowing
 
 `run_pipeline` processes flows in fixed `window_seconds` slices. Within a window,
@@ -70,7 +52,6 @@ Weights come from `config/config.yaml` (`fusion_weights`, renormalized to sum 1)
 Threat class is taken from the most interpretable signal that fired: rules →
 graph structure → `UNKNOWN` for a pure anomaly (the zero-day path).
 
-<<<<<<< HEAD
 ## Phase 5 — scale-out (`streaming/service.py`)
 
 ```
@@ -106,10 +87,3 @@ Enforced: `src/uninet/assistant/` must not import `socket`, `subprocess`,
 `requests`, `scapy`, … (`tests/test_assistant_readonly.py`). The HTTP API exposes
 no mutating routes; `POST /api/ask` is the offline templated assistant (no LLM,
 no network) so the read-only guarantee holds by construction.
-=======
-## Read-only guarantee
-
-`src/uninet/assistant/` must not import `socket`, `subprocess`, `requests`,
-`scapy`, … — enforced by `tests/test_assistant_readonly.py`. The API exposes no
-mutating routes; `POST /api/ask` returns `501` until Phase 4.
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181

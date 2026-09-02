@@ -1,18 +1,19 @@
 FROM python:3.12-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    UNINET_API_HOST=0.0.0.0 \
-    UNINET_API_PORT=8000
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
-COPY pyproject.toml requirements.txt README.md LICENSE ./
+
+COPY pyproject.toml README.md LICENSE requirements.txt ./
+
 COPY src ./src
 COPY config ./config
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install .
 
 COPY . .
 
-EXPOSE 8000
-# Single command: trains the model on first boot, runs the pipeline, serves the dashboard.
-CMD ["uninet", "--no-open"]
+CMD sh -c 'uninet --host 0.0.0.0 --port ${PORT:-8000} --no-open'

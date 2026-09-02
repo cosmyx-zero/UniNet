@@ -9,7 +9,6 @@ alerts. No return path, no probing, no payload decryption.
 
 ---
 
-<<<<<<< HEAD
 ## Status — all 5 phases implemented
 
 | Phase | Scope | State |
@@ -65,38 +64,6 @@ python -m pytest                          # 41 tests
 Optional extras: `.[dev]` (pytest/ruff), `.[pcap]` (scapy), `.[stream]` (Kafka one-way bus),
 `.[ml]` (torch + torch-geometric for the real RGAT), `.[data]` (TII-SSRC-23 loader).
 
-=======
-## Status — Phase 1 + Phase 2 implemented
-
-| Phase | Scope | State |
-|-------|-------|-------|
-| 1 | ingestion → features → TB-Graph → detector → API → dashboard | ✅ |
-| 2 | RGAT + anomaly model → fused threat score | ✅ (RGAT via `[ml]` extra; heuristic graph scorer otherwise) |
-| 3 | explainability (feature importance, subgraph, timeline) | scaffold only |
-| 4 | read-only analyst assistant | scaffold only (`POST /api/ask` → 501) |
-
-On the built-in synthetic scenarios (8 seeds): **precision 1.0, recall 1.0, FP-rate 0.0**;
-single-thread throughput ≈ **24k flows/sec**. These are the defensible numbers — see
-`python -m uninet.eval.metrics`.
-
-## Quick start
-
-```bash
-python -m pip install -e ".[dev]"        # core + pytest/ruff
-python -m uninet.demo                     # synthetic traffic → alerts table + ground-truth check
-python -m uninet.demo --serve             # + dashboard & API at http://127.0.0.1:8000
-python -m uninet.training.train_anomaly   # fit the Isolation Forest (optional)
-python -m uninet.eval.metrics             # detection metrics
-python -m uninet.eval.throughput_bench --flows 200000
-python -m pytest                          # 21 tests
-```
-
-Optional extras: `.[pcap]` (scapy), `.[stream]` (Kafka one-way bus),
-`.[ml]` (torch + torch-geometric for the real RGAT), `.[data]` (TII-SSRC-23 loader).
-
-Ingest a real capture: `python -m uninet.demo --pcap capture.pcap`.
-
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 ## Layout
 
 ```
@@ -107,13 +74,8 @@ src/uninet/
   features/     flow/DNS/TLS/JA3/temporal extractor + behavioural fingerprint
   baseline/     adaptive per-host profile (false-positive suppression)
   tb_graph/     burst_builder → graph_builder → graph_store        ⭐ core
-<<<<<<< HEAD
   detection/    rules · anomaly_model · rgat_model · sequence_model · detector (evidence fusion)
   explainability/  narrative + factors + timeline   ·   assistant/  offline read-only Q&A
-=======
-  detection/    rules · anomaly_model · rgat_model · detector (evidence fusion)
-  explainability/ , assistant/   (Phase 3 / 4 — read-only)
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
   api/          Flask endpoints + static dashboard
 tests/  eval/  docs/  scripts/  notebooks/  config/
 ```

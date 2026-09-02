@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """Turn an :class:`Alert` into an analyst-facing explanation (Phase 3).
 
 Everything here is derived from data the detector already put on the alert -
@@ -13,19 +12,11 @@ Output of :func:`explain_alert`:
     graph       - anchors with their node kind + a one-line read
     timeline    - ordered burst events reconstructed from the anchors
     narrative   - 2-3 plain-English sentences
-=======
-"""Render an :class:`Alert` into an analyst-facing explanation.
-
-Phase 1/2 scope: reformat the evidence the detector already produced (rule hits,
-anomaly score, TB-Graph structure) into an ordered, weighted "why" list plus the
-graph anchors to highlight. Phase 3 extends this with per-feature importance.
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 """
 from __future__ import annotations
 
 from uninet.schemas.alert import Alert
 
-<<<<<<< HEAD
 # Human labels for the numbers rules/anomaly stash in Evidence.data.
 _FACTOR_LABELS: dict[str, str] = {
     "flow_count": "flows in window",
@@ -174,25 +165,3 @@ def feature_importance(
     ]
     rows.sort(key=lambda r: -abs(r["z"]))
     return rows[:top]
-=======
-
-def explain_alert(alert: Alert) -> dict:
-    ordered = sorted(alert.evidence, key=lambda e: -e.score)
-    return {
-        "alert_id": alert.alert_id,
-        "verdict": f"{alert.threat_type.value} ({alert.severity.value})",
-        "confidence": alert.confidence,
-        "fused_from": alert.scores,
-        "why": [
-            {
-                "signal": e.kind.value,
-                "name": e.name,
-                "weight": round(e.score, 3),
-                "detail": e.detail,
-            }
-            for e in ordered
-        ],
-        "graph_anchors": alert.graph_node_ids,
-        "window": [alert.window_start, alert.window_end],
-    }
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
