@@ -1,12 +1,12 @@
-# UniNet
+# UniNet (Demo Version)
 ## AI-Based Detection of Cyber Threats in Unidirectional IP Traffic
-
-SIH26145 · Team Cosmyx Zero · Theme: Blockchain & Cybersecurity
 
 Passive, unidirectional, read-only threat detection: behavioural fingerprinting →
 **Traffic-Burst Graph** → hybrid AI engine (rules + anomaly + RGAT) → evidence-backed
 alerts. No return path, no probing, no payload decryption.
 
+https://uninet-y6g8.onrender.com/ - user : admin & password : Admin@.07 
+(These Secret is Temporary)
 ---
 
 ## Status — all 5 phases implemented
