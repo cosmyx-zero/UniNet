@@ -1,0 +1,30 @@
+# Tunable thresholds for the statistical / rule-based detectors (detection/rules.py).
+# These are deliberately conservative starting points; calibrate on TII-SSRC-23.
+
+ddos:
+  min_flows_per_window: 200      # flows from one host inside the window
+  min_packets_per_second: 300    # measured over the active span, not window width
+  max_mean_flow_bytes: 400       # DDoS floods are many tiny flows
+  confidence_at_2x: 0.95         # confidence when metrics hit 2x threshold
+
+c2_beacon:
+  min_bursts: 4
+  max_interval_cov: 0.25         # coefficient of variation of inter-burst gaps
+  max_burst_bytes: 5000         # beacons are small, regular check-ins
+  min_confidence: 0.6
+
+dga:
+  min_unique_domains: 15
+  min_mean_label_entropy: 3.4    # Shannon entropy (bits/char) of the 2LD label
+  min_nxdomain_ratio: 0.3        # fraction of lookups that fail
+  min_confidence: 0.6
+
+port_scan:
+  min_unique_dst_ports: 50
+  max_mean_flow_packets: 3
+  max_mean_flow_bytes: 300
+
+data_exfil:
+  min_outbound_bytes: 52428800   # 50 MB sustained egress in-window
+  min_out_in_ratio: 8.0          # outbound:inbound byte ratio
+  max_peers: 3
