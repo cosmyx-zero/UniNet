@@ -15,10 +15,7 @@ from uninet.config import Settings, load_settings
 from uninet.detection.anomaly_model import AnomalyModel
 from uninet.detection.rgat_model import GraphScore, GraphThreatScorer
 from uninet.detection.rules import RuleEngine, RuleHit
-<<<<<<< HEAD
 from uninet.detection.sequence_model import SequenceScore, SequenceThreatScorer
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 from uninet.detection.threat_types import ThreatType
 from uninet.features.extractor import HostWindowFeatures
 from uninet.schemas.alert import Alert, Evidence, EvidenceKind, Severity
@@ -48,19 +45,13 @@ class Detector:
         rule_engine: RuleEngine | None = None,
         anomaly_model: AnomalyModel | None = None,
         graph_scorer: GraphThreatScorer | None = None,
-<<<<<<< HEAD
         sequence_scorer: SequenceThreatScorer | None = None,
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     ) -> None:
         self.cfg = config or DetectorConfig()
         self.rules = rule_engine or RuleEngine()
         self.anomaly = anomaly_model or AnomalyModel()
         self.graph_scorer = graph_scorer or GraphThreatScorer()
-<<<<<<< HEAD
         self.sequence_scorer = sequence_scorer or SequenceThreatScorer()
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
     # ------------------------------------------------------------------ #
     @classmethod
@@ -70,10 +61,7 @@ class Detector:
             config=DetectorConfig.from_settings(s),
             anomaly_model=AnomalyModel.load_or_none(s.model_path_anomaly) or AnomalyModel(),
             graph_scorer=GraphThreatScorer(s.model_path_rgat),
-<<<<<<< HEAD
             sequence_scorer=SequenceThreatScorer(s.model_path_sequence),
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
         )
 
     # ------------------------------------------------------------------ #
@@ -97,13 +85,10 @@ class Detector:
             else GraphScore(0.0, ThreatType.BENIGN, [], "no graph supplied")
         )
 
-<<<<<<< HEAD
         # 4th signal: temporal read of the burst sequence. Additive evidence only -
         # it does not enter the fusion math or the threat-class decision.
         seq: SequenceScore = self.sequence_scorer.score(feats.bursts, feats.host)
 
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
         threat = self._decide_threat(rule_threat, gs, anomaly_score)
         if threat in (ThreatType.BENIGN,):
             return None
@@ -125,11 +110,7 @@ class Detector:
         if fused < self.cfg.alert_threshold:
             return None
 
-<<<<<<< HEAD
         evidence = self._collect_evidence(rule_hits, anomaly_score, baseline_novelty, gs, seq)
-=======
-        evidence = self._collect_evidence(rule_hits, anomaly_score, baseline_novelty, gs)
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
         return Alert(
             window_start=feats.window_start,
             window_end=feats.window_end,
@@ -146,10 +127,7 @@ class Detector:
                 "rule": round(rule_score, 4),
                 "anomaly": round(anomaly_score, 4),
                 "graph": round(gs.score, 4),
-<<<<<<< HEAD
                 "sequence": round(seq.score, 4),
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
             },
         )
 
@@ -179,12 +157,8 @@ class Detector:
 
     @staticmethod
     def _collect_evidence(
-<<<<<<< HEAD
         rule_hits: list[RuleHit], anomaly_score: float, baseline_novelty: float,
         gs: GraphScore, seq: SequenceScore | None = None
-=======
-        rule_hits: list[RuleHit], anomaly_score: float, baseline_novelty: float, gs: GraphScore
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     ) -> list[Evidence]:
         ev = [h.evidence for h in rule_hits]
         if anomaly_score >= 0.6:
@@ -201,7 +175,6 @@ class Detector:
                 score=gs.score,
                 data={"top_nodes": gs.top_nodes, "hint": gs.threat_hint.value},
             ))
-<<<<<<< HEAD
         if seq is not None and seq.score >= 0.5:
             ev.append(Evidence(
                 kind=EvidenceKind.ML, name="temporal_sequence",
@@ -209,8 +182,6 @@ class Detector:
                 score=seq.score,
                 data={**seq.features, "hint": seq.threat_hint.value},
             ))
-=======
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
         return ev
 
     @staticmethod

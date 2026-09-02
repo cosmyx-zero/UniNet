@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: uninet
+    runtime: docker
+    plan: starter
+    region: singapore
+
+    disk:
+      name: uninet-models
+      mountPath: /app/models
+      sizeGB: 1
+
+    healthCheckPath: /health
+
+    autoDeployTrigger: commit
+
+    envVars:
+      - key: UNINET_API_HOST
+        value: "0.0.0.0"
+
+      - key: UNINET_AUTH_USER
+        sync: false
+
+      - key: UNINET_AUTH_PASSWORD
+        sync: false
+
+      - key: UNINET_SECRET_KEY
+        generateValue: true

@@ -1,5 +1,4 @@
 <!doctype html>
-<<<<<<< HEAD
 <html lang="en" class="dark">
 <head>
 <meta charset="utf-8" />
@@ -403,45 +402,6 @@ tailwind.config = {
 
   </main>
 </div>
-=======
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>UniNet - Threat Console</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-</head>
-<body>
-<header>
-  <h1>UniNet <span class="tag">read-only</span></h1>
-  <div id="stats" class="stats">loading…</div>
-</header>
-
-<main>
-  <section id="alerts-pane">
-    <h2>Alerts</h2>
-    <table id="alerts">
-      <thead>
-        <tr><th>Sev</th><th>Threat</th><th>Host</th><th>Conf</th>
-            <th>rule / anom / graph</th><th>Top evidence</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </section>
-
-  <section id="detail-pane">
-    <h2>Evidence <small id="detail-host"></small></h2>
-    <ul id="evidence"></ul>
-    <h2>TB-Graph</h2>
-    <svg id="graph" viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet"></svg>
-    <p class="legend">
-      <span class="dot host"></span>host
-      <span class="dot burst"></span>burst
-      <span class="dot domain"></span>domain
-    </p>
-  </section>
-</main>
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

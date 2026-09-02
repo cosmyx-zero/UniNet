@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # One command:   docker compose up
 # Then open      http://localhost:8000   (login: admin / uninet)
 #
@@ -10,25 +9,16 @@ services:
     ports:
       - "8000:8000"
     environment:
+      PORT: "8000"
       UNINET_API_HOST: "0.0.0.0"
-      UNINET_API_PORT: "8000"
       UNINET_AUTH_USER: "${UNINET_AUTH_USER:-admin}"
       UNINET_AUTH_PASSWORD: "${UNINET_AUTH_PASSWORD:-uninet}"
       UNINET_SECRET_KEY: "${UNINET_SECRET_KEY:-uninet-dev-secret-change-me}"
-    # Persist the trained anomaly model between runs.
     volumes:
       - uninet-models:/app/models
 
-  # Optional: Kafka one-way bus. Enable with:  docker compose --profile kafka up
   kafka:
     profiles: ["kafka"]
-=======
-# Optional infrastructure for the streaming demo. Not required for `make demo`
-# (the default in-process bus needs nothing). Bring this up only to exercise the
-# Kafka one-way transport:  docker compose up -d  &&  UNINET_BUS=kafka make serve
-services:
-  kafka:
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     image: bitnami/kafka:3.7
     ports:
       - "9092:9092"
@@ -41,19 +31,5 @@ services:
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       ALLOW_PLAINTEXT_LISTENER: "yes"
 
-<<<<<<< HEAD
 volumes:
   uninet-models:
-=======
-  api:
-    build: .
-    command: python -m uninet.demo --serve --no-open
-    ports:
-      - "8000:8000"
-    environment:
-      UNINET_BUS: kafka
-      UNINET_KAFKA_BROKERS: kafka:9092
-      UNINET_API_HOST: 0.0.0.0
-    depends_on:
-      - kafka
->>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181

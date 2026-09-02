@@ -29,5 +29,7 @@ frontend/dist/
 
 # Env / editors
 .env
+.env.*
+!.env.example
 .idea/
 .vscode/
