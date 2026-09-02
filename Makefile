@@ -1,7 +1,11 @@
 # UniNet developer tasks.  Windows: use `make` from Git Bash, or run the python
 # commands directly (shown in each recipe).
 
+<<<<<<< HEAD
 .PHONY: install install-dev demo serve up live scale train eval test lint clean
+=======
+.PHONY: install install-dev demo serve train eval test lint clean
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
 install:            ## Install core runtime + editable package
 	python -m pip install -e .
@@ -12,6 +16,7 @@ install-dev:        ## Install with dev + data extras
 demo:              ## Run the end-to-end synthetic pipeline, print JSON alerts
 	python -m uninet.demo
 
+<<<<<<< HEAD
 serve up:          ## Single command: train-if-needed -> pipeline -> dashboard (login admin/uninet)
 	uninet
 
@@ -20,6 +25,10 @@ live:              ## Dashboard that keeps refreshing detections (Phase 5 live c
 
 scale:             ## Phase 5: parallel pipeline across 4 process workers
 	uninet --workers 4
+=======
+serve:             ## Run the demo and serve the dashboard + API
+	python -m uninet.demo --serve
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
 train:             ## Train the anomaly model (+ RGAT if torch is installed)
 	python -m uninet.training.train_anomaly

@@ -28,7 +28,10 @@ data = ["pandas>=2.0"]
 dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.3"]
 
 [project.scripts]
+<<<<<<< HEAD
 uninet = "uninet.cli:main"
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 uninet-demo = "uninet.demo:main"
 
 [tool.setuptools.packages.find]

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Streaming transport + pipeline. In-process bus by default; Kafka is opt-in."""
 from uninet.streaming.bus import InProcBus, MessageBus, make_bus
 from uninet.streaming.service import LiveService, run_sharded
@@ -13,3 +14,9 @@ __all__ = [
     "run_pipeline",
     "run_sharded",
 ]
+=======
+"""Streaming transport. Default is a zero-dependency in-process bus; Kafka is opt-in."""
+from uninet.streaming.bus import InProcBus, MessageBus, make_bus
+
+__all__ = ["InProcBus", "MessageBus", "make_bus"]
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181

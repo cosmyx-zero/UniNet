@@ -10,7 +10,10 @@ from uninet.streaming.worker import run_pipeline
 @pytest.fixture(scope="module")
 def client():
     settings = load_settings()
+<<<<<<< HEAD
     settings.auth_disabled = True  # exercise the API without the login flow
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     result = run_pipeline(SyntheticSource(seed=7), settings, detector=Detector.from_settings(settings))
     app = create_app(result, settings=settings)
     app.config.update(TESTING=True)
@@ -35,6 +38,7 @@ def test_graph_for_host(client):
     host = alerts[0]["src_host"]
     view = client.get(f"/api/graph?host={host}").get_json()
     assert "nodes" in view and "edges" in view
+<<<<<<< HEAD
     burst = next((n for n in view["nodes"] if n["type"] == "burst"), None)
     assert burst and "peer" in burst["attrs"]  # IP info is on graph nodes
 
@@ -90,3 +94,9 @@ def test_ask_intent_routing(client):
     ]:
         got = client.post("/api/ask", json={"question": q}).get_json()["intent"]
         assert got == want, (q, got)
+=======
+
+
+def test_ask_is_blocked(client):
+    assert client.post("/api/ask", json={"q": "hi"}).status_code == 501
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181

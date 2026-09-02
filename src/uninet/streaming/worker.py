@@ -35,6 +35,7 @@ class PipelineResult:
     def alerts_json(self) -> list[dict]:
         return [a.model_dump(mode="json") for a in self.alerts]
 
+<<<<<<< HEAD
     def merge(self, other: PipelineResult) -> PipelineResult:
         """Fold another result in. Safe when partitions are host-disjoint."""
         self.alerts.extend(other.alerts)
@@ -52,6 +53,8 @@ def merge_results(results: list[PipelineResult]) -> PipelineResult:
     out.alerts.sort(key=lambda a: -a.confidence)
     return out
 
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
 def _drain(source: FlowSource, bus: MessageBus, topic: str) -> list[FlowRecord]:
     """Publish every record onto the bus, then read it all back (one-way)."""
@@ -69,7 +72,10 @@ def run_pipeline(
     detector: Detector | None = None,
     profile_store: ProfileStore | None = None,
     use_bus: bool = True,
+<<<<<<< HEAD
     window_anchor: float | None = None,
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 ) -> PipelineResult:
     s = settings or load_settings()
     detector = detector or Detector.from_settings(s)
@@ -91,7 +97,11 @@ def run_pipeline(
     graph_builder = GraphBuilder()
     extractor = FeatureExtractor(s.window_seconds)
 
+<<<<<<< HEAD
     t0 = window_anchor if window_anchor is not None else flows[0].start_ts
+=======
+    t0 = flows[0].start_ts
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     t_end = flows[-1].start_ts
     win = float(s.window_seconds)
 

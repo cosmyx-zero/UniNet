@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* ============================================================================
    UniNet Threat Workspace — "Obsidian Protocol"
    Matches Stitch project 17901618257925659577 (design system "Obsidian
@@ -228,3 +229,49 @@ svg#graph text.host-lbl { fill: var(--primary-pale); font-size: 10px; font-weigh
 }
 .login-hint { color: var(--on-surface-variant); font: 400 .72rem/1.4 var(--mono); text-align: center; margin: 2px 0 0; }
 .login-hint code { color: var(--primary-dim); }
+=======
+:root {
+  --bg: #0f1420; --panel: #171e2e; --line: #2a3550; --fg: #e6ebf5;
+  --muted: #8a97b5; --crit: #ff5470; --high: #ff9f45; --med: #ffd24a; --low: #4ad991;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+  display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap;
+  padding: 1rem 1.5rem; border-bottom: 1px solid var(--line);
+}
+h1 { margin: 0; font-size: 1.25rem; letter-spacing: .5px; }
+.tag {
+  font-size: .65rem; text-transform: uppercase; letter-spacing: 1px;
+  border: 1px solid var(--low); color: var(--low); border-radius: 4px;
+  padding: 1px 6px; vertical-align: middle;
+}
+.stats { color: var(--muted); font-variant-numeric: tabular-nums; }
+main {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; padding: 1rem 1.5rem;
+}
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
+h2 { margin: .2rem 0 .8rem; font-size: .95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: .78rem; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #1e273c; }
+tbody tr.active { background: #263354; }
+.sev { font-weight: 700; }
+.sev.critical { color: var(--crit); } .sev.high { color: var(--high); }
+.sev.medium { color: var(--med); } .sev.low { color: var(--low); }
+.bar { height: 6px; background: #263354; border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--high); }
+#evidence { list-style: none; padding: 0; margin: 0 0 1rem; }
+#evidence li { padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 6px; margin-bottom: .4rem; }
+#evidence .kind { font-size: .68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+svg#graph { width: 100%; height: auto; background: #10162a; border-radius: 6px; }
+.legend { color: var(--muted); font-size: .78rem; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 12px; }
+.dot.host { background: #6ea8ff; } .dot.burst { background: #ffd24a; } .dot.domain { background: #4ad991; }
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181

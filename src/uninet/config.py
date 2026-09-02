@@ -38,17 +38,23 @@ class Settings:
     model_dir: str = "models"
     anomaly_model: str = "anomaly_isoforest.joblib"
     rgat_model: str = "rgat.pt"
+<<<<<<< HEAD
     sequence_model: str = "sequence_gru.pt"
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000
 
+<<<<<<< HEAD
     # ---- dashboard auth (single operator account; prototype-grade) ------
     auth_disabled: bool = False
     auth_user: str = "admin"
     auth_password: str = "uninet"
     secret_key: str = "uninet-dev-secret-change-me"
 
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     # ---- derived helpers -------------------------------------------------
     @property
     def model_path_anomaly(self) -> Path:
@@ -58,10 +64,13 @@ class Settings:
     def model_path_rgat(self) -> Path:
         return REPO_ROOT / self.model_dir / self.rgat_model
 
+<<<<<<< HEAD
     @property
     def model_path_sequence(self) -> Path:
         return REPO_ROOT / self.model_dir / self.sequence_model
 
+=======
+>>>>>>> 11c991a836dcd892041c7cbc1d186621b44cc181
     def normalized_fusion_weights(self) -> dict[str, float]:
         total = sum(self.fusion_weights.values()) or 1.0
         return {k: v / total for k, v in self.fusion_weights.items()}
