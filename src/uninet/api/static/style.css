@@ -75,6 +75,9 @@ body { background: var(--bg); color: var(--on-surface); font-family: var(--sans)
   padding: 12px; border-radius: 0 4px 4px 0; cursor: pointer;
   background: var(--surface-low); border-left: 2px solid var(--outline);
   transition: background .12s, border-color .12s;
+  /* Skip layout + paint for off-screen cards — measurably faster at 1 000+ hosts. */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 76px;
 }
 .q-card:hover { background: var(--surface); }
 .q-card.sev-critical { background: rgba(147, 0, 10, .18); border-left-color: var(--error); }
