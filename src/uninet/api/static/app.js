@@ -50,16 +50,98 @@ async function loadConfig() {
     if (d) d.title = c.live ? "live mode — detections refresh every few seconds" : "real-time stream connected";
   } catch (_) {}
 }
+/* ================= host pagination ================= */
+const _hp = { page: 0, total: 0, pages: 0, loading: false, version: -1, dirty: false };
+let _hpSentinel = null;
+
+const _hpObserver = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && !_hp.loading) _loadHostPage();
+}, { rootMargin: "150px" });
+
+async function _loadHostPage() {
+  if (_hp.loading) return;
+  if (_hp.page > 0 && _hp.page >= _hp.pages) return;
+  _hp.loading = true;
+  const q = (state.filter.q || "").trim();
+  const next = _hp.page + 1;
+  try {
+    const data = await j(`/api/hosts?page=${next}&per_page=50${q ? "&q=" + encodeURIComponent(q) : ""}`);
+    _hp.page = data.page;
+    _hp.total = data.total;
+    _hp.pages = data.pages;
+    state.hosts = state.hosts.concat(data.items);
+    _appendHostCards(data.items);
+    const list = $("#host-list");
+    if (!_hpSentinel) {
+      _hpSentinel = document.createElement("div");
+      _hpSentinel.className = "host-sentinel h-1";
+      _hpObserver.observe(_hpSentinel);
+    }
+    list.appendChild(_hpSentinel);
+    _paintHostCount();
+  } catch (_) {} finally { _hp.loading = false; }
+}
+
+function _resetHosts() {
+  _hp.page = 0; _hp.total = 0; _hp.pages = 0; _hp.loading = false; _hp.dirty = false;
+  state.hosts = [];
+  const list = $("#host-list");
+  list.innerHTML = "";
+  _loadHostPage();
+}
+
+function _paintHostCount() {
+  const remaining = _hp.total - state.hosts.length;
+  $("#list-count").textContent = remaining > 0
+    ? `${state.hosts.length} / ${_hp.total}`
+    : `${_hp.total}`;
+}
+
+function _appendHostCards(items) {
+  const list = $("#host-list");
+  const frag = document.createDocumentFragment();
+  items.forEach((h) => {
+    const al = h.alert, sev = al ? al.severity : "low";
+    const card = document.createElement("div");
+    card.className = "q-card sev-" + sev + (state.activeHost === h.ip ? " active" : "");
+    card.dataset.ip = h.ip;
+    card.innerHTML =
+      `<div class="flex justify-between items-start"><span class="q-title">${esc(h.ip)}</span><span class="q-time">${h.flows} fl</span></div>` +
+      `<div class="q-meta">${h.bursts} bursts · ${h.peer_count} peers · ${(h.bytes / 1e6).toFixed(1)} MB</div>` +
+      `<div class="mt-2 flex gap-2 flex-wrap">` +
+      (al
+        ? `<span class="q-chip ${al.severity === "critical" ? "crit" : al.severity === "high" ? "high" : ""}">${esc(al.threat.toUpperCase())}</span>`
+        : `<span class="q-chip">CLEAN</span>`) +
+      `<span class="q-chip">${esc(h.fingerprint || "—")}</span></div>`;
+    card.onclick = () => selectHost(h);
+    frag.appendChild(card);
+  });
+  // Insert before sentinel if it exists, otherwise append.
+  if (_hpSentinel && list.contains(_hpSentinel)) list.insertBefore(frag, _hpSentinel);
+  else list.appendChild(frag);
+}
+
+/* ================= debounce ================= */
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
 let _ticking = false;
 async function tick() {
   if (_ticking) return;
   _ticking = true;
   try {
-    const [stats, alerts, hosts] = await Promise.all([j("/api/stats"), j("/api/alerts"), j("/api/hosts")]);
-    if (typeof stats.version === "number") state.version = stats.version;
-    state.alerts = alerts; state.hosts = hosts;
-    state.lastUpdate = Date.now();
-    paintStats(stats);
+    const [stats, alerts] = await Promise.all([j("/api/stats"), j("/api/alerts")]);
+    if (typeof stats.version === "number") {
+      const changed = stats.version !== state.version;
+      state.version = stats.version;
+      state.alerts = alerts;
+      state.lastUpdate = Date.now();
+      paintStats(stats);
+      // Mark host list dirty on data change; renderHosts() will reset it.
+      if (changed) _hp.dirty = true;
+    }
     render();
     paintRefreshed();
   } catch (_) {} finally { _ticking = false; }
@@ -71,6 +153,9 @@ function paintStats(s) {
   const gs = $("#graph-sub");
   if (gs) gs.textContent = `VIEW: LOGICAL TOPOLOGY | ACTIVE NODES: ${g.nodes ?? 0} | FLOWS: ${(s.flows ?? 0).toLocaleString()}`;
   const ha = $("#hdr-alerts"); if (ha) ha.textContent = s.alerts ?? "—";
+  // Device counter — shown alongside the alert count in the header.
+  const hd = $("#hdr-devices");
+  if (hd) hd.textContent = (s.device_count ?? s.hosts ?? "—");
 }
 function paintRefreshed() {
   const el = $("#refreshed");
@@ -141,24 +226,17 @@ function renderAlerts() {
 }
 
 function renderHosts() {
-  const rows = state.hosts.filter((h) => matchQ(`${h.ip} ${(h.alert && h.alert.threat) || ""}`));
-  $("#list-count").textContent = `${rows.length}`;
+  // Reset list on first entry or when SSE signals new data.
+  if (_hp.dirty || (_hp.page === 0 && !_hp.loading)) {
+    _resetHosts();
+    return;
+  }
+  // Update active highlight without re-rendering the whole list.
   const list = $("#host-list");
-  list.innerHTML = rows.length ? "" : `<div class="p-3 font-data-md text-[12px] text-outline">NO HOSTS</div>`;
-  rows.forEach((h) => {
-    const al = h.alert, sev = al ? al.severity : "low";
-    const card = document.createElement("div");
-    card.className = `q-card sev-${sev}` + (state.activeHost === h.ip ? " active" : "");
-    card.innerHTML = `
-      <div class="flex justify-between items-start"><span class="q-title">${esc(h.ip)}</span><span class="q-time">${h.flows} fl</span></div>
-      <div class="q-meta">${h.bursts} bursts · ${h.peer_count} peers · ${(h.bytes / 1e6).toFixed(1)} MB</div>
-      <div class="mt-2 flex gap-2 flex-wrap">
-        ${al ? `<span class="q-chip ${al.severity === "critical" ? "crit" : al.severity === "high" ? "high" : ""}">${esc(al.threat.toUpperCase())}</span>` : `<span class="q-chip">CLEAN</span>`}
-        <span class="q-chip">${esc(h.fingerprint || "—")}</span>
-      </div>`;
-    card.onclick = () => selectHost(h);
-    list.appendChild(card);
+  list.querySelectorAll(".q-card[data-ip]").forEach((card) => {
+    card.classList.toggle("active", card.dataset.ip === state.activeHost);
   });
+  _paintHostCount();
 }
 
 /* ================= selection ================= */
@@ -616,7 +694,11 @@ function connectStream() {
 $$("#rail .nav-icon[data-screen]").forEach((b) => b.onclick = () => setScreen(b.dataset.screen));
 $("#filter-clear").onclick = clearFilter;
 $("#queue-clear").onclick = clearFilter;
-$("#queue-mode").onclick = () => { state.queueMode = state.queueMode === "alerts" ? "hosts" : "alerts"; render(); };
+$("#queue-mode").onclick = () => {
+  state.queueMode = state.queueMode === "alerts" ? "hosts" : "alerts";
+  if (state.queueMode === "hosts") _hp.dirty = true;
+  render();
+};
 $("#queue-filter").onclick = () => {
   const order = [undefined, "critical", "high", "medium", "low"];
   state.filter.severity = order[(order.indexOf(state.filter.severity) + 1) % order.length];
@@ -670,14 +752,28 @@ $("#chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !
 $("#chat-input").addEventListener("input", function () { this.style.height = "auto"; this.style.height = Math.min(128, this.scrollHeight) + "px"; });
 $("#chat-export").onclick = exportChat;
 
-/* search */
+/* search — debounced; in host mode the query is sent to the server */
 const _search = $("#search");
-_search.addEventListener("input", () => {
+const _onSearchInput = debounce(() => {
   state.filter.q = _search.value.trim().toLowerCase() || undefined;
+  if (state.queueMode === "hosts") {
+    _hp.dirty = true;
+    render();
+  } else {
+    render();
+  }
+}, 300);
+_search.addEventListener("input", () => {
   $("#search-clear").classList.toggle("hidden", !_search.value);
-  render();
+  _onSearchInput();
 });
-$("#search-clear").onclick = () => { _search.value = ""; state.filter.q = undefined; $("#search-clear").classList.add("hidden"); render(); };
+$("#search-clear").onclick = () => {
+  _search.value = "";
+  state.filter.q = undefined;
+  $("#search-clear").classList.add("hidden");
+  if (state.queueMode === "hosts") { _hp.dirty = true; }
+  render();
+};
 
 setScreen("workspace");
 loadConfig();
