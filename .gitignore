@@ -33,3 +33,20 @@ frontend/dist/
 !.env.example
 .idea/
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Deployment lock files not needed in repo
+*.pid
