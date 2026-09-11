@@ -358,11 +358,8 @@ function storyStep(dir) {
 let _badge = null;
 function flashNewThreat() { const b = $("#new-threat-badge"); b.classList.remove("hidden"); clearTimeout(_badge); _badge = setTimeout(() => b.classList.add("hidden"), 4500); }
 
-/* ================= GRAPH EXPLORER — structured datapath layout ================= */
+/* ================= GRAPH EXPLORER — force-directed layout ================= */
 const GX_W = 1280, GX_H = 720;
-const GX_TOP = 96, GX_BOT = 64, GX_COL_HOST = 96, GX_COL_BURST0 = 300;
-const GX_MAX_BURSTS = 16;
-const GX_SPINE = ["burst_in", "burst_out", "periodic", "direction_change"];
 let gxZoom = 1, gxPanX = 0, gxPanY = 0;
 
 function applyGX() {
@@ -371,101 +368,128 @@ function applyGX() {
 function enterGraphScreen() {
   gxZoom = 1; gxPanX = 0; gxPanY = 0; applyGX();
   if (state.graphView) { drawGX(state.graphView); return; }
-  // no selection yet — focus the busiest host so the datapath stays readable
   const host = (state.activeAlertObj && state.activeAlertObj.src_host)
     || (state.alerts[0] && state.alerts[0].src_host);
   const url = host ? `/api/graph?host=${encodeURIComponent(host)}` : "/api/graph";
   j(url).then((v) => { state.graphView = v; drawGX(v); }).catch(() => {});
 }
 
-/* Assign every node an (x,y) on a left→right datapath:
-   host  ──emits──▶  ordered burst chain (t →)  ──resolves──▶  domain column   */
-function datapathLayout(view) {
-  const nodes = view.nodes || [], edges = view.edges || [];
+/* Force-directed layout: repulsion + edge springs + weak gravity → organic network */
+function forceLayout(view) {
+  const nodes = (view.nodes || []).map((n) => ({ ...n }));
+  const edges = view.edges || [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const hosts = nodes.filter((n) => n.type === "host");
-  const bursts = nodes.filter((n) => n.type === "burst");
-  const domains = nodes.filter((n) => n.type === "domain");
-  const alerts = nodes.filter((n) => n.type === "alert");
-  const colDom = GX_W - 150;
 
-  // order bursts along their forward sequence edges
-  const next = new Map();
-  edges.forEach((e) => {
-    if (byId.get(e.src)?.type === "burst" && byId.get(e.dst)?.type === "burst" && GX_SPINE.includes(e.rel) && !next.has(e.src))
-      next.set(e.src, e.dst);
-  });
-  const indeg = new Map(bursts.map((b) => [b.id, 0]));
-  next.forEach((d) => indeg.set(d, (indeg.get(d) || 0) + 1));
-  const ordered = [], seen = new Set();
-  bursts.filter((b) => (indeg.get(b.id) || 0) === 0).forEach((root) => {
-    let cur = root.id;
-    while (cur && !seen.has(cur)) { seen.add(cur); ordered.push(byId.get(cur)); cur = next.get(cur); }
-  });
-  bursts.forEach((b) => { if (!seen.has(b.id)) ordered.push(b); });
+  const CX = GX_W / 2, CY = GX_H / 2;
+  const PAD = 80;
 
-  // group into per-host lanes
-  const hostKey = (h) => h.attrs?.ip || h.id;
-  const laneKeys = hosts.length ? hosts.map(hostKey) : ["_"];
-  const lanes = new Map(laneKeys.map((k) => [k, []]));
-  ordered.forEach((b) => {
-    const k = b.attrs?.host && lanes.has(b.attrs.host) ? b.attrs.host : laneKeys[0];
-    lanes.get(k).push(b);
+  // Seed positions by type so the simulation starts in a reasonable state
+  const typeCounts = {}, typeIdx = {};
+  nodes.forEach((n) => { typeCounts[n.type] = (typeCounts[n.type] || 0) + 1; typeIdx[n.type] = 0; });
+  nodes.forEach((n) => {
+    const i = typeIdx[n.type]++, total = typeCounts[n.type];
+    const angle = (2 * Math.PI * i) / Math.max(1, total);
+    const radii = { host: 90, burst: 240, domain: 360, alert: 160 };
+    const r = radii[n.type] || 200;
+    // Spread angles so same-type nodes don't stack
+    const jitter = (n.type === "burst") ? (i % 3) * 35 : 0;
+    n.x = CX + Math.cos(angle) * (r + jitter);
+    n.y = CY + Math.sin(angle) * (r + jitter) * 0.72; // flatten vertically
+    n.vx = 0; n.vy = 0;
   });
 
-  const place = new Map();
-  const laneCount = Math.max(1, lanes.size);
-  const laneH = (GX_H - GX_TOP - GX_BOT) / laneCount;
-  const dense = laneCount > 3;
-  let li = 0, shownBursts = 0, totalBursts = bursts.length;
-  lanes.forEach((bs, key) => {
-    const cy = GX_TOP + laneH * (li + 0.5); li++;
-    const hNode = hosts.find((h) => hostKey(h) === key);
-    if (hNode) place.set(hNode.id, { x: GX_COL_HOST, y: cy });
-    const list = bs.slice(0, GX_MAX_BURSTS);
-    shownBursts += list.length;
-    const span = colDom - 120 - GX_COL_BURST0;
-    list.forEach((b, i) => {
-      const x = list.length === 1 ? GX_COL_BURST0 + span * 0.4 : GX_COL_BURST0 + span * (i / (list.length - 1));
-      place.set(b.id, { x, y: cy });
+  // Spring parameters per edge type
+  const SPRING = {
+    emits:            { k: 0.05, len: 180 },
+    raised_on:        { k: 0.14, len: 52  },
+    resolves:         { k: 0.04, len: 155 },
+    periodic:         { k: 0.07, len: 115 },
+    burst_in:         { k: 0.07, len: 88  },
+    burst_out:        { k: 0.07, len: 88  },
+    direction_change: { k: 0.07, len: 88  },
+  };
+  const REPULSION = 4500, DAMPING = 0.82, GRAVITY = 0.0007;
+  const ITERS = 220;
+
+  for (let iter = 0; iter < ITERS; iter++) {
+    const alpha = Math.pow(1 - iter / ITERS, 0.55);
+
+    // Pairwise repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x || 0.1, dy = b.y - a.y || 0.1;
+        const d2 = dx * dx + dy * dy + 0.01;
+        const d = Math.sqrt(d2);
+        const f = (REPULSION * alpha) / d2;
+        const fx = f * dx / d, fy = f * dy / d;
+        if (a.type !== "host") { a.vx -= fx; a.vy -= fy; }
+        if (b.type !== "host") { b.vx += fx; b.vy += fy; }
+      }
+    }
+
+    // Edge springs
+    edges.forEach((e) => {
+      const a = byId.get(e.src), b = byId.get(e.dst);
+      if (!a || !b) return;
+      const sp = SPRING[e.rel] || { k: 0.04, len: 130 };
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = sp.k * (d - sp.len);
+      const fx = f * dx / d, fy = f * dy / d;
+      if (a.type !== "host") { a.vx += fx; a.vy += fy; }
+      if (b.type !== "host") { b.vx -= fx; b.vy -= fy; }
     });
+
+    // Weak gravity toward canvas center
+    nodes.forEach((n) => {
+      if (n.type === "host") return;
+      n.vx += (CX - n.x) * GRAVITY * alpha;
+      n.vy += (CY - n.y) * GRAVITY * alpha;
+    });
+
+    // Integrate positions
+    nodes.forEach((n) => {
+      if (n.type === "host") return; // hosts are pinned after seeding
+      n.vx *= DAMPING; n.vy *= DAMPING;
+      n.x = Math.max(PAD, Math.min(GX_W - PAD, n.x + n.vx));
+      n.y = Math.max(PAD, Math.min(GX_H - PAD, n.y + n.vy));
+    });
+  }
+
+  // Snap alert nodes directly above their correlated burst
+  nodes.forEach((n) => {
+    if (n.type !== "alert") return;
+    const on = edges.find((e) => e.src === n.id && e.rel === "raised_on");
+    const tgt = on && byId.get(on.dst);
+    if (tgt) { n.x = tgt.x; n.y = tgt.y - 50; }
   });
 
-  // domains: right column, y ≈ mean of the bursts that resolve to them, then de-overlap
-  const rows = domains.map((d) => {
-    const ys = edges.filter((e) => e.dst === d.id && e.rel === "resolves")
-      .map((e) => place.get(e.src)?.y).filter((v) => v != null);
-    return { d, y: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : GX_H / 2 };
-  }).sort((a, b) => a.y - b.y);
-  const gap = 30;
-  for (let i = 1; i < rows.length; i++) if (rows[i].y - rows[i - 1].y < gap) rows[i].y = rows[i - 1].y + gap;
-  const overflow = rows.length ? rows[rows.length - 1].y - (GX_H - GX_BOT) : 0;
-  rows.forEach((o) => place.set(o.d.id, { x: colDom, y: Math.max(GX_TOP, o.y - Math.max(0, overflow)) }));
-
-  alerts.forEach((al) => {
-    const on = edges.find((e) => e.src === al.id && e.rel === "raised_on");
-    const p = on && place.get(on.dst);
-    place.set(al.id, { x: p ? p.x : GX_COL_HOST, y: p ? p.y - 44 : GX_TOP });
-  });
-
-  nodes.forEach((n) => { const p = place.get(n.id); if (p) { n.x = p.x; n.y = p.y; } });
+  const bursts = nodes.filter((n) => n.type === "burst");
   return {
-    nodes: nodes.filter((n) => place.has(n.id)),
-    edges: edges.filter((e) => place.has(e.src) && place.has(e.dst)),
-    shownBursts, totalBursts, dense,
+    nodes,
+    edges: edges.filter((e) => byId.has(e.src) && byId.has(e.dst)),
+    shownBursts: bursts.length, totalBursts: bursts.length,
+    dense: nodes.length > 60,
   };
 }
 
-function gxEdgePath(x1, y1, x2, y2) {
+function gxEdgePath(x1, y1, x2, y2, rel) {
+  if (rel === "raised_on") {
+    const midY = (y1 + y2) / 2;
+    return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+  }
   const mx = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
 }
 function styleGXEdge(p, rel) {
-  if (rel === "periodic") { p.setAttribute("stroke", "url(#gx-flow)"); p.setAttribute("stroke-width", "2.5"); p.setAttribute("stroke-dasharray", "9 6"); p.setAttribute("class", "edge-anim"); }
-  else if (rel === "direction_change") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "5 4"); p.setAttribute("stroke-opacity", ".9"); }
-  else if (rel === "burst_in" || rel === "burst_out") { p.setAttribute("stroke", "#00dbe7"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-opacity", ".55"); }
-  else if (rel === "resolves") { p.setAttribute("stroke", "#e8c423"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".55"); }
-  else if (rel === "emits") { p.setAttribute("stroke", "#849495"); p.setAttribute("stroke-width", "1"); p.setAttribute("stroke-opacity", ".28"); }
+  const arr = (id) => p.setAttribute("marker-end", `url(#${id})`);
+  if (rel === "periodic") { p.setAttribute("stroke", "url(#gx-flow)"); p.setAttribute("stroke-width", "2.5"); p.setAttribute("stroke-dasharray", "9 6"); p.setAttribute("class", "edge-anim"); arr("gx-arr-b"); }
+  else if (rel === "direction_change") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "5 4"); p.setAttribute("stroke-opacity", ".9"); arr("gx-arr-r"); }
+  else if (rel === "burst_in" || rel === "burst_out") { p.setAttribute("stroke", "#00dbe7"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-opacity", ".65"); arr("gx-arr-b"); }
+  else if (rel === "resolves") { p.setAttribute("stroke", "#e8c423"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".6"); arr("gx-arr-g"); }
+  else if (rel === "emits") { p.setAttribute("stroke", "#849495"); p.setAttribute("stroke-width", "1"); p.setAttribute("stroke-opacity", ".35"); arr("gx-arr-b"); }
+  else if (rel === "raised_on") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "4 3"); p.setAttribute("stroke-opacity", ".9"); arr("gx-arr-r"); }
   else { p.setAttribute("stroke", "#3a494b"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".7"); }
   p.setAttribute("fill", "none");
 }
@@ -482,20 +506,31 @@ const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n
 function drawGX(view) {
   const svg = $("#gx-svg");
   [...svg.querySelectorAll(":scope > *:not(defs)")].forEach((n) => n.remove());
-  const g = datapathLayout({ nodes: (view.nodes || []).map((n) => ({ ...n })), edges: view.edges || [] });
+  const g = forceLayout({ nodes: (view.nodes || []).map((n) => ({ ...n })), edges: view.edges || [] });
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
 
-  // column guide headers
-  [["HOST", GX_COL_HOST], ["TRAFFIC BURSTS   ( t → )", (GX_COL_BURST0 + GX_W - 150) / 2], ["RESOLVED DOMAINS", GX_W - 150]]
-    .forEach(([label, x]) => svg.appendChild(gxText(x, 40, label, "gx-head")));
-  if (g.totalBursts > g.shownBursts)
-    svg.appendChild(gxText((GX_COL_BURST0 + GX_W - 150) / 2, 60, `showing ${g.shownBursts} of ${g.totalBursts} bursts`, "gx-note"));
+  // Legend (top-left)
+  const legendItems = [
+    ["HOST", "#00f2ff"], ["BURST", "#ffe173"], ["DOMAIN", "#c3a3ff"], ["ALERT", "#ffb4ab"],
+  ];
+  legendItems.forEach(([label, color], i) => {
+    const lx = 20, ly = 20 + i * 20;
+    const dot = document.createElementNS(SVGNS, "circle");
+    dot.setAttribute("cx", lx); dot.setAttribute("cy", ly - 4);
+    dot.setAttribute("r", "5"); dot.setAttribute("fill", color);
+    svg.appendChild(dot);
+    svg.appendChild(gxText(lx + 12, ly, label, "gx-note", "start"));
+  });
+
+  // Stats bar (bottom)
+  const statsLabel = `${g.nodes.length} nodes · ${g.edges.length} edges`;
+  svg.appendChild(gxText(GX_W / 2, GX_H - 10, statsLabel, "gx-note"));
 
   // edges (behind nodes)
   g.edges.forEach((e) => {
     const p = byId.get(e.src), q = byId.get(e.dst); if (!p || !q) return;
     const path = document.createElementNS(SVGNS, "path");
-    path.setAttribute("d", gxEdgePath(p.x, p.y, q.x, q.y));
+    path.setAttribute("d", gxEdgePath(p.x, p.y, q.x, q.y, e.rel));
     styleGXEdge(path, e.rel);
     svg.appendChild(path);
   });
@@ -513,9 +548,24 @@ function drawGX(view) {
       halo.setAttribute("stroke", "#ffb4ab"); halo.setAttribute("stroke-width", "1.5");
       halo.setAttribute("class", "node-ping");
       grp.appendChild(halo);
+    } else if (n.type === "alert") {
+      const halo = document.createElementNS(SVGNS, "circle");
+      halo.setAttribute("r", "19"); halo.setAttribute("fill", "none");
+      halo.setAttribute("stroke", "#ffb4ab"); halo.setAttribute("stroke-width", "2");
+      halo.setAttribute("class", "node-ping");
+      grp.appendChild(halo);
+    } else if (n.type === "host") {
+      const hostBursts = new Set(g.edges.filter(e => e.src === n.id && e.rel === "emits").map(e => e.dst));
+      if (g.nodes.some(a => a.type === "alert" && g.edges.some(e => e.src === a.id && e.rel === "raised_on" && hostBursts.has(e.dst)))) {
+        const ring = document.createElementNS(SVGNS, "circle");
+        ring.setAttribute("r", "23"); ring.setAttribute("fill", "none");
+        ring.setAttribute("stroke", "#ffb4ab"); ring.setAttribute("stroke-width", "1.5");
+        ring.setAttribute("stroke-opacity", ".4"); ring.setAttribute("stroke-dasharray", "4 3");
+        grp.appendChild(ring);
+      }
     }
     const c = document.createElementNS(SVGNS, "circle");
-    const r = n.type === "host" ? 16 : n.type === "burst" ? 9 : n.type === "alert" ? 7 : 8;
+    const r = n.type === "host" ? 16 : n.type === "burst" ? Math.max(7, Math.min(18, 7 + Math.log10(+(a.byte_count || 1) + 1) * 2)) : n.type === "alert" ? 11 : 8;
     c.setAttribute("r", r);
     c.setAttribute("fill", n.type === "alert" ? "#ffb4ab" : NODE_COLOR[n.type] || "#889");
     c.setAttribute("filter", n.type === "burst" || n.type === "alert" ? "url(#gx-glow-burst)" : "url(#gx-glow)");
@@ -531,11 +581,21 @@ function drawGX(view) {
       if (!g.dense) {
         grp.appendChild(gxText(0, r + 16, clip(a.peer || "burst", 20), "gx-lbl"));
         grp.appendChild(gxText(0, r + 28, `${(a.flow_count | 0)} fl · ${fmtBytes(a.byte_count)}`, "gx-sub"));
+      } else {
+        grp.appendChild(gxText(0, r + 13, clip(a.peer || "", 12), "gx-sub"));
       }
     } else if (n.type === "alert") {
-      grp.appendChild(gxText(0, -r - 8, "ALERT", "gx-lbl gx-alert"));
+      const alertLbl = a.threat_type ? clip(a.threat_type.replace(/_/g, " "), g.dense ? 12 : 18) : "ALERT";
+      grp.appendChild(gxText(0, -r - 8, alertLbl, "gx-lbl gx-alert"));
     }
 
+    const ttl = document.createElementNS(SVGNS, "title");
+    ttl.textContent = n.type === "host" ? `Host: ${a.ip || n.id}`
+      : n.type === "burst" ? `${a.peer || n.id} · ${(a.flow_count | 0)} flows · ${fmtBytes(a.byte_count)}`
+      : n.type === "domain" ? `Domain: ${a.name || n.id}`
+      : n.type === "alert" ? `Alert: ${(a.threat_type || "").replace(/_/g, " ")} · ${a.severity || "?"}`
+      : n.id;
+    grp.appendChild(ttl);
     grp.addEventListener("click", (ev) => { ev.stopPropagation(); showGXMeta(n); });
     svg.appendChild(grp);
   });
@@ -549,6 +609,13 @@ function showGXMeta(n) {
   let title = n.id, addr = "—", metric = n.type.toUpperCase(), detail = "";
   if (n.type === "host") { title = a.ip || "HOST"; addr = a.ip || "—"; metric = "HOST NODE"; detail = "Local host / monitored endpoint. Central anchor of its TB-subgraph."; }
   else if (n.type === "domain") { title = a.name || "DOMAIN"; addr = a.name || "—"; metric = "DOMAIN"; detail = `Resolved domain observed in traffic bursts for this host.`; }
+  else if (n.type === "alert") {
+    title = (a.threat_type || "ALERT").replace(/_/g, " ").toUpperCase();
+    addr = a.src_host || "—";
+    metric = `${(a.severity || "ALERT").toUpperCase()} · CONF ${(+(a.confidence || 0)).toFixed(2)}`;
+    const on = (state.graphView?.edges || []).find(e => e.src === n.id && e.rel === "raised_on");
+    detail = `threat: ${a.threat_type || "?"}\ncorrelated burst: ${on ? on.dst : "—"}`;
+  }
   else if (n.type === "burst") {
     title = "TRAFFIC BURST"; addr = a.peer || "—";
     metric = a.intra_periodicity != null ? `periodicity ${(+a.intra_periodicity).toFixed(2)}` : "BURST";
@@ -562,7 +629,7 @@ function showGXMeta(n) {
   sc.textContent = metric;
   sc.className = "font-data-md text-[14px] " + (n.type === "burst" ? "text-error" : "text-primary-fixed-dim");
   $("#gx-meta-history").textContent = detail || "—";
-  $("#gx-meta").dataset.pivot = a.ip || a.peer || a.name || "";
+  $("#gx-meta").dataset.pivot = a.ip || a.src_host || a.peer || a.name || "";
 }
 
 /* ================= AI INTELLIGENCE screen ================= */
@@ -717,7 +784,7 @@ $("#ws-open-ai").onclick = () => {
 
 /* graph explorer controls */
 $("#gx-zoom-in").onclick = () => { gxZoom = Math.min(5, gxZoom * 1.3); applyGX(); };
-$("#gx-zoom-out").onclick = () => { gxZoom = Math.max(0.4, gxZoom / 1.3); applyGX(); };
+$("#gx-zoom-out").onclick = () => { gxZoom = Math.max(0.25, gxZoom / 1.3); applyGX(); };
 $("#gx-center").onclick = () => { gxPanX = 0; gxPanY = 0; applyGX(); };
 $("#gx-reset").onclick = () => { gxZoom = 1; gxPanX = 0; gxPanY = 0; applyGX(); if (state.graphView) drawGX(state.graphView); };
 $("#gx-meta-close").onclick = () => $("#gx-meta").classList.add("translate-x-full");
@@ -745,6 +812,15 @@ $("#gx-trace").onclick = () => {
     applyGX();
   });
 })();
+
+/* mouse-wheel zoom — pinch to zoom on trackpads via deltaY */
+document.getElementById("gx-container").addEventListener("wheel", (ev) => {
+  if (state.screen !== "graph") return;
+  ev.preventDefault();
+  const factor = ev.deltaY > 0 ? 1.15 : 1 / 1.15;
+  gxZoom = Math.max(0.25, Math.min(5, gxZoom * factor));
+  applyGX();
+}, { passive: false });
 
 /* AI chat */
 $("#chat-send").onclick = () => chatSend();

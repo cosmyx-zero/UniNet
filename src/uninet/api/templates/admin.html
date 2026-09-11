@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UniNet · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    colors: {
+      "background": "#0d1515","surface": "#0d1515","surface-container-lowest": "#080f10",
+      "surface-container-low": "#151d1e","surface-container": "#192122",
+      "surface-container-high": "#232b2c","surface-container-highest": "#2e3637",
+      "surface-variant": "#2e3637","on-surface": "#dce4e4","on-surface-variant": "#b9cacb",
+      "outline": "#849495","outline-variant": "#3a494b",
+      "primary-fixed-dim": "#00dbe7","primary-container": "#00f2ff",
+      "tertiary-fixed": "#ffe173","error": "#ffb4ab",
+    },
+    fontFamily: {
+      "data-md": ["'JetBrains Mono'","ui-monospace","monospace"],
+      "label-caps": ["'JetBrains Mono'","ui-monospace","monospace"],
+    },
+  }},
+};
+</script>
+<style>
+body { background: #0d1515; color: #dce4e4; font-family: Inter, ui-sans-serif, system-ui; }
+.field { display:flex; flex-direction:column; gap:4px; }
+.field label { font-family: 'JetBrains Mono', monospace; font-size:11px; letter-spacing:.08em; color:#849495; text-transform:uppercase; }
+.field input, .field select {
+  background: #192122; border: 1px solid #3a494b; color:#dce4e4;
+  padding: 8px 12px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:13px; outline:none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus { border-color: #00dbe7; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:4px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.06em; cursor:pointer;
+  border:none; transition: background .15s, opacity .15s; }
+.btn-primary { background:#00dbe7; color:#002022; }
+.btn-primary:hover { background:#00f2ff; }
+.btn-danger { background:transparent; color:#ffb4ab; border:1px solid #ffb4ab33; }
+.btn-danger:hover { background:#ffb4ab20; }
+.btn-ghost { background:transparent; color:#b9cacb; border:1px solid #3a494b; }
+.btn-ghost:hover { background:#192122; }
+.card { background:#192122; border:1px solid #3a494b40; border-radius:6px; padding:20px; }
+.badge { display:inline-block; padding:2px 8px; border-radius:3px; font-family:'JetBrains Mono',monospace;
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
+.badge-admin { background:#00dbe720; color:#00dbe7; }
+.badge-operator { background:#ffe17320; color:#ffe173; }
+.badge-viewer { background:#3a494b; color:#849495; }
+.toast { position:fixed; bottom:24px; right:24px; z-index:99; padding:12px 20px; border-radius:6px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; transition:opacity .3s; }
+.toast-ok  { background:#00363a; border:1px solid #00dbe7; color:#00dbe7; }
+.toast-err { background:#690005; border:1px solid #ffb4ab; color:#ffb4ab; }
+table { width:100%; border-collapse:collapse; }
+th { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  color:#849495; text-align:left; padding:8px 12px; border-bottom:1px solid #3a494b40; }
+td { padding:10px 12px; border-bottom:1px solid #3a494b20; font-size:13px; vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:#ffffff05; }
+dialog { background:#192122; border:1px solid #3a494b; border-radius:8px; color:#dce4e4; padding:28px; min-width:360px; }
+dialog::backdrop { background:#00000080; }
+dialog h2 { font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:.08em; color:#00dbe7;
+  text-transform:uppercase; margin-bottom:20px; }
+</style>
+</head>
+<body>
+
+<!-- nav rail -->
+<aside style="position:fixed;left:0;top:0;height:100%;width:72px;background:#151d1e;border-right:1px solid #3a494b30;display:flex;flex-direction:column;align-items:center;padding:24px 0;z-index:50;">
+  <div style="width:36px;height:36px;background:#00dbe720;border:1px solid #00dbe740;border-radius:6px;display:grid;place-items:center;margin-bottom:32px;">
+    <span class="material-symbols-outlined" style="color:#00dbe7;font-size:20px;">radar</span>
+  </div>
+  <a href="/" title="Dashboard" style="display:flex;justify-content:center;width:100%;padding:14px 0;color:#849495;" class="hover:text-[#00dbe7]">
+    <span class="material-symbols-outlined">grid_view</span>
+  </a>
+  <a href="/admin/" title="Admin Panel" style="display:flex;justify-content:center;width:100%;padding:14px 0;color:#00dbe7;background:#00dbe710;">
+    <span class="material-symbols-outlined">admin_panel_settings</span>
+  </a>
+  <a href="{{ url_for('auth.logout') }}" style="display:flex;justify-content:center;width:100%;padding:14px 0;color:#849495;margin-top:auto;" class="hover:text-[#ffb4ab]">
+    <span class="material-symbols-outlined">logout</span>
+  </a>
+</aside>
+
+<div style="padding-left:72px;min-height:100vh;">
+  <!-- header -->
+  <header style="position:sticky;top:0;background:#0d151590;backdrop-filter:blur(16px);border-bottom:1px solid #3a494b20;padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;z-index:40;">
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:#849495;">ADMIN_PANEL</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#00dbe7;">USER &amp; GROUP MANAGEMENT</div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#849495;">{{ user }}</div>
+  </header>
+
+  <main style="padding:32px;max-width:1100px;display:flex;flex-direction:column;gap:32px;">
+
+    <!-- ===== Users ===== -->
+    <section class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 style="font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.08em;color:#00dbe7;text-transform:uppercase;margin:0;">Users</h2>
+          <p style="font-size:12px;color:#849495;margin:4px 0 0;">Operator accounts with dashboard access</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('dlg-user').showModal()">
+          <span class="material-symbols-outlined" style="font-size:16px;">person_add</span> ADD USER
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="user-table">
+          <thead><tr>
+            <th>USERNAME</th><th>ROLE</th><th>GROUP / ORG</th><th style="text-align:right;">ACTIONS</th>
+          </tr></thead>
+          <tbody id="user-tbody"><tr><td colspan="4" style="color:#849495;font-family:'JetBrains Mono',monospace;font-size:12px;">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== Groups / Orgs ===== -->
+    <section class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 style="font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.08em;color:#ffe173;text-transform:uppercase;margin:0;">Groups &amp; Organisations</h2>
+          <p style="font-size:12px;color:#849495;margin:4px 0 0;">Logical groupings for multi-team deployments</p>
+        </div>
+        <button class="btn btn-ghost" onclick="document.getElementById('dlg-group').showModal()">
+          <span class="material-symbols-outlined" style="font-size:16px;">group_add</span> ADD GROUP
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="group-table">
+          <thead><tr><th>NAME</th><th>DESCRIPTION</th><th style="text-align:right;">ACTIONS</th></tr></thead>
+          <tbody id="group-tbody"><tr><td colspan="3" style="color:#849495;font-family:'JetBrains Mono',monospace;font-size:12px;">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===== Dialog: Add User ===== -->
+<dialog id="dlg-user">
+  <h2>Add User</h2>
+  <form id="form-user" style="display:flex;flex-direction:column;gap:16px;" onsubmit="submitUser(event)">
+    <div class="field"><label>Username</label><input name="username" required autocomplete="off" /></div>
+    <div class="field"><label>Password</label><input name="password" type="password" required autocomplete="new-password" /></div>
+    <div class="field">
+      <label>Role</label>
+      <select name="role">
+        <option value="operator">Operator — full dashboard access</option>
+        <option value="viewer">Viewer — read-only dashboard</option>
+        <option value="admin">Admin — user management + dashboard</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Group / Org</label>
+      <select name="group" id="user-group-sel">
+        <option value="">— none —</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px;">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('dlg-user').close()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Edit User ===== -->
+<dialog id="dlg-edit-user">
+  <h2>Edit User</h2>
+  <form id="form-edit-user" style="display:flex;flex-direction:column;gap:16px;" onsubmit="submitEditUser(event)">
+    <input type="hidden" name="username" id="edit-username" />
+    <div class="field">
+      <label>Role</label>
+      <select name="role" id="edit-role">
+        <option value="operator">Operator</option>
+        <option value="viewer">Viewer</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Group / Org</label>
+      <select name="group" id="edit-group-sel">
+        <option value="">— none —</option>
+      </select>
+    </div>
+    <div class="field"><label>New Password (leave blank to keep)</label><input name="password" type="password" autocomplete="new-password" /></div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px;">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('dlg-edit-user').close()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Add Group ===== -->
+<dialog id="dlg-group">
+  <h2>Add Group</h2>
+  <form id="form-group" style="display:flex;flex-direction:column;gap:16px;" onsubmit="submitGroup(event)">
+    <div class="field"><label>Name</label><input name="name" required autocomplete="off" /></div>
+    <div class="field"><label>Description</label><input name="description" autocomplete="off" /></div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px;">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('dlg-group').close()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Toast -->
+<div id="toast" class="toast" style="opacity:0;pointer-events:none;"></div>
+
+<script>
+"use strict";
+let _groups = [];
+
+function toast(msg, ok = true) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast " + (ok ? "toast-ok" : "toast-err");
+  t.style.opacity = "1";
+  t.style.pointerEvents = "auto";
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => { t.style.opacity = "0"; t.style.pointerEvents = "none"; }, 3200);
+}
+
+async function api(url, method = "GET", body = null) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  const d = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, data: d };
+}
+
+function roleBadge(role) {
+  const cls = { admin: "badge-admin", operator: "badge-operator", viewer: "badge-viewer" }[role] || "badge-viewer";
+  return `<span class="badge ${cls}">${role}</span>`;
+}
+
+function populateGroupSelects() {
+  const opts = `<option value="">— none —</option>` + _groups.map(g => `<option value="${g.name}">${g.name}</option>`).join("");
+  document.getElementById("user-group-sel").innerHTML = opts;
+  document.getElementById("edit-group-sel").innerHTML = opts;
+}
+
+async function loadUsers() {
+  const { ok, data } = await api("/admin/api/users");
+  if (!ok) return;
+  const tbody = document.getElementById("user-tbody");
+  if (!data.users.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#849495;font-family:'JetBrains Mono',monospace;font-size:12px;">No users yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.users.map(u => `
+    <tr>
+      <td><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;color:#849495;margin-right:6px;">person</span>${u.username}</td>
+      <td>${roleBadge(u.role)}</td>
+      <td style="color:#849495;font-size:12px;">${u.group || "—"}</td>
+      <td style="text-align:right;">
+        ${u.username !== "{{ user }}" || true ? `
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick='openEditUser(${JSON.stringify(u)})'>
+          <span class="material-symbols-outlined" style="font-size:13px;">edit</span> Edit
+        </button>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;margin-left:6px;" onclick="deleteUser('${u.username}')">
+          <span class="material-symbols-outlined" style="font-size:13px;">delete</span>
+        </button>` : ""}
+      </td>
+    </tr>`).join("");
+}
+
+async function loadGroups() {
+  const { ok, data } = await api("/admin/api/groups");
+  if (!ok) return;
+  _groups = data.groups || [];
+  populateGroupSelects();
+  const tbody = document.getElementById("group-tbody");
+  if (!_groups.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:#849495;font-family:'JetBrains Mono',monospace;font-size:12px;">No groups yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _groups.map(g => `
+    <tr>
+      <td style="font-family:'JetBrains Mono',monospace;color:#ffe173;">${g.name}</td>
+      <td style="color:#849495;font-size:13px;">${g.description || "—"}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="deleteGroup('${g.name}')">
+          <span class="material-symbols-outlined" style="font-size:13px;">delete</span>
+        </button>
+      </td>
+    </tr>`).join("");
+}
+
+async function submitUser(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const { ok, data } = await api("/admin/api/users", "POST", Object.fromEntries(fd));
+  if (ok) {
+    toast("User created"); document.getElementById("dlg-user").close();
+    e.target.reset(); loadUsers();
+  } else toast(data.error || "Failed to create user", false);
+}
+
+function openEditUser(u) {
+  document.getElementById("edit-username").value = u.username;
+  document.getElementById("edit-role").value = u.role;
+  document.getElementById("edit-group-sel").value = u.group || "";
+  document.querySelector("#form-edit-user [name=password]").value = "";
+  document.getElementById("dlg-edit-user").showModal();
+}
+
+async function submitEditUser(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const username = fd.get("username");
+  const body = { role: fd.get("role"), group: fd.get("group") };
+  const pw = fd.get("password");
+  if (pw) body.password = pw;
+  const { ok, data } = await api(`/admin/api/users/${encodeURIComponent(username)}`, "PATCH", body);
+  if (ok) {
+    toast("User updated"); document.getElementById("dlg-edit-user").close(); loadUsers();
+  } else toast(data.error || "Failed to update user", false);
+}
+
+async function deleteUser(username) {
+  if (!confirm(`Delete user "${username}"?`)) return;
+  const { ok, data } = await api(`/admin/api/users/${encodeURIComponent(username)}`, "DELETE");
+  if (ok) { toast("User deleted"); loadUsers(); }
+  else toast(data.error || "Failed", false);
+}
+
+async function submitGroup(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const { ok, data } = await api("/admin/api/groups", "POST", Object.fromEntries(fd));
+  if (ok) {
+    toast("Group created"); document.getElementById("dlg-group").close();
+    e.target.reset(); loadGroups();
+  } else toast(data.error || "Failed", false);
+}
+
+async function deleteGroup(name) {
+  if (!confirm(`Delete group "${name}"?`)) return;
+  const { ok, data } = await api(`/admin/api/groups/${encodeURIComponent(name)}`, "DELETE");
+  if (ok) { toast("Group deleted"); loadGroups(); }
+  else toast(data.error || "Failed", false);
+}
+
+loadGroups();
+loadUsers();
+</script>
+</body>
+</html>
