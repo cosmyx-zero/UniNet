@@ -530,6 +530,21 @@ function drawGX(view) {
       halo.setAttribute("stroke", "#ffb4ab"); halo.setAttribute("stroke-width", "1.5");
       halo.setAttribute("class", "node-ping");
       grp.appendChild(halo);
+    } else if (n.type === "alert") {
+      const halo = document.createElementNS(SVGNS, "circle");
+      halo.setAttribute("r", "19"); halo.setAttribute("fill", "none");
+      halo.setAttribute("stroke", "#ffb4ab"); halo.setAttribute("stroke-width", "2");
+      halo.setAttribute("class", "node-ping");
+      grp.appendChild(halo);
+    } else if (n.type === "host") {
+      const hostBursts = new Set(g.edges.filter(e => e.src === n.id && e.rel === "emits").map(e => e.dst));
+      if (g.nodes.some(a => a.type === "alert" && g.edges.some(e => e.src === a.id && e.rel === "raised_on" && hostBursts.has(e.dst)))) {
+        const ring = document.createElementNS(SVGNS, "circle");
+        ring.setAttribute("r", "23"); ring.setAttribute("fill", "none");
+        ring.setAttribute("stroke", "#ffb4ab"); ring.setAttribute("stroke-width", "1.5");
+        ring.setAttribute("stroke-opacity", ".4"); ring.setAttribute("stroke-dasharray", "4 3");
+        grp.appendChild(ring);
+      }
     }
     const c = document.createElementNS(SVGNS, "circle");
     const r = n.type === "host" ? 16 : n.type === "burst" ? Math.max(7, Math.min(18, 7 + Math.log10(+(a.byte_count || 1) + 1) * 2)) : n.type === "alert" ? 11 : 8;
@@ -550,7 +565,8 @@ function drawGX(view) {
         grp.appendChild(gxText(0, r + 28, `${(a.flow_count | 0)} fl · ${fmtBytes(a.byte_count)}`, "gx-sub"));
       }
     } else if (n.type === "alert") {
-      grp.appendChild(gxText(0, -r - 8, "ALERT", "gx-lbl gx-alert"));
+      const alertLbl = a.threat_type ? clip(a.threat_type.replace(/_/g, " "), g.dense ? 12 : 18) : "ALERT";
+      grp.appendChild(gxText(0, -r - 8, alertLbl, "gx-lbl gx-alert"));
     }
 
     grp.addEventListener("click", (ev) => { ev.stopPropagation(); showGXMeta(n); });
@@ -566,6 +582,13 @@ function showGXMeta(n) {
   let title = n.id, addr = "—", metric = n.type.toUpperCase(), detail = "";
   if (n.type === "host") { title = a.ip || "HOST"; addr = a.ip || "—"; metric = "HOST NODE"; detail = "Local host / monitored endpoint. Central anchor of its TB-subgraph."; }
   else if (n.type === "domain") { title = a.name || "DOMAIN"; addr = a.name || "—"; metric = "DOMAIN"; detail = `Resolved domain observed in traffic bursts for this host.`; }
+  else if (n.type === "alert") {
+    title = (a.threat_type || "ALERT").replace(/_/g, " ").toUpperCase();
+    addr = a.src_host || "—";
+    metric = `${(a.severity || "ALERT").toUpperCase()} · CONF ${(+(a.confidence || 0)).toFixed(2)}`;
+    const on = (state.graphView?.edges || []).find(e => e.src === n.id && e.rel === "raised_on");
+    detail = `threat: ${a.threat_type || "?"}\ncorrelated burst: ${on ? on.dst : "—"}`;
+  }
   else if (n.type === "burst") {
     title = "TRAFFIC BURST"; addr = a.peer || "—";
     metric = a.intra_periodicity != null ? `periodicity ${(+a.intra_periodicity).toFixed(2)}` : "BURST";
@@ -579,7 +602,7 @@ function showGXMeta(n) {
   sc.textContent = metric;
   sc.className = "font-data-md text-[14px] " + (n.type === "burst" ? "text-error" : "text-primary-fixed-dim");
   $("#gx-meta-history").textContent = detail || "—";
-  $("#gx-meta").dataset.pivot = a.ip || a.peer || a.name || "";
+  $("#gx-meta").dataset.pivot = a.ip || a.src_host || a.peer || a.name || "";
 }
 
 /* ================= AI INTELLIGENCE screen ================= */
