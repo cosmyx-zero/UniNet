@@ -409,7 +409,7 @@ function forceLayout(view) {
     direction_change: { k: 0.07, len: 88  },
   };
   const REPULSION = 4500, DAMPING = 0.82, GRAVITY = 0.0007;
-  const ITERS = 220;
+  const ITERS = 140;
 
   for (let iter = 0; iter < ITERS; iter++) {
     const alpha = Math.pow(1 - iter / ITERS, 0.55);
@@ -506,6 +506,16 @@ const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n
 function drawGX(view) {
   const svg = $("#gx-svg");
   [...svg.querySelectorAll(":scope > *:not(defs)")].forEach((n) => n.remove());
+
+  // Show placeholder while the layout runs so the UI doesn't freeze silently
+  const loading = document.createElementNS(SVGNS, "text");
+  loading.setAttribute("x", GX_W / 2); loading.setAttribute("y", GX_H / 2);
+  loading.setAttribute("text-anchor", "middle"); loading.setAttribute("class", "gx-note");
+  loading.textContent = "Computing layout…";
+  svg.appendChild(loading);
+
+  setTimeout(() => {
+  [...svg.querySelectorAll(":scope > *:not(defs)")].forEach((n) => n.remove());
   const g = forceLayout({ nodes: (view.nodes || []).map((n) => ({ ...n })), edges: view.edges || [] });
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
 
@@ -599,6 +609,7 @@ function drawGX(view) {
     grp.addEventListener("click", (ev) => { ev.stopPropagation(); showGXMeta(n); });
     svg.appendChild(grp);
   });
+  }, 0); // end setTimeout — yields to the browser so the loading text renders first
 }
 function showGXMeta(n) {
   const a = n.attrs || {};
@@ -727,7 +738,7 @@ async function chatSend(text) {
   try {
     const r = await fetch("/api/ask", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: val, alert_id: state.activeAlert, host: state.activeHost || (state.activeAlertObj && state.activeAlertObj.src_host) }),
+      body: JSON.stringify({ question: val, alert_id: state.activeAlert, host: state.activeHost || (state.activeAlertObj && state.activeAlertObj.src_host) }),
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.answer) appendChat("NEXUS_AI", esc(d.answer));

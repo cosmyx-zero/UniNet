@@ -19,6 +19,10 @@ https://uninet-y6g8.onrender.com/ - user : admin & password : Admin@.07
 | 4 | read-only analyst assistant — offline templated Q&A over alert/evidence/graph | ✅ (`POST /api/ask {question, alert_id?}`) |
 | 5 | scale-out: host-partitioned parallel workers + live console | ✅ (`--workers N`, `--live`) |
 
+**Recent fixes**
+- `POST /api/ask` — corrected request key from `q` to `question`; the assistant now responds correctly instead of returning 400.
+- Graph Explorer — `forceLayout` now yields to the browser before computing (shows "Computing layout…") and runs 36% fewer iterations, eliminating the frozen-canvas stall on larger graphs.
+
 On the built-in synthetic scenarios (8 seeds): **precision 1.0, recall 1.0, FP-rate 0.0**;
 single-thread throughput ≈ **9–24k flows/sec**, ~1.3–2× with `--workers 4`. Defensible
 numbers — see `python -m uninet.eval.metrics` / `...throughput_bench`.
