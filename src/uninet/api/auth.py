@@ -29,9 +29,10 @@ def _settings():
 
 def check_credentials(user: str, password: str) -> bool:
     s = _settings()
-    return hmac.compare_digest(user or "", s.auth_user) and hmac.compare_digest(
-        password or "", s.auth_password
-    )
+    if hmac.compare_digest(user or "", s.auth_user) and hmac.compare_digest(password or "", s.auth_password):
+        return True
+    store = current_app.config.get("USER_STORE")
+    return bool(store and store.check_password(user, password))
 
 
 def is_authenticated() -> bool:
@@ -65,6 +66,12 @@ def do_login():
     if check_credentials(user, password):
         session["user"] = user
         session.permanent = True
+        s = _settings()
+        if user == s.auth_user:
+            session["role"] = "admin"
+        else:
+            store = current_app.config.get("USER_STORE")
+            session["role"] = store.get_role(user) if store else "operator"
         return redirect(nxt if nxt.startswith("/") else "/")
     return render_template("login.html", error="Invalid credentials", next=nxt), 401
 

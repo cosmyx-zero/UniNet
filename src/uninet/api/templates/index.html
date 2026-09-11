@@ -73,7 +73,14 @@ tailwind.config = {
       <span class="material-symbols-outlined">psychology</span><span class="nav-tip">AI_INTELLIGENCE</span>
     </button>
   </nav>
-  <a href="{{ url_for('auth.logout') }}" class="nav-icon mt-auto group relative flex items-center justify-center w-full h-14 text-on-surface-variant" title="Sign out">
+  {% if session.get('role') == 'admin' %}
+  <a href="{{ url_for('admin.panel') }}" class="nav-icon group relative flex items-center justify-center w-full h-14 text-on-surface-variant mt-auto" title="Admin Panel">
+    <span class="material-symbols-outlined">admin_panel_settings</span><span class="nav-tip">ADMIN_PANEL</span>
+  </a>
+  {% else %}
+  <div class="mt-auto"></div>
+  {% endif %}
+  <a href="{{ url_for('auth.logout') }}" class="nav-icon group relative flex items-center justify-center w-full h-14 text-on-surface-variant" title="Sign out">
     <span class="material-symbols-outlined">logout</span><span class="nav-tip">SIGN OUT · {{ user }}</span>
   </a>
 </aside>

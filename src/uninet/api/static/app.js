@@ -358,11 +358,8 @@ function storyStep(dir) {
 let _badge = null;
 function flashNewThreat() { const b = $("#new-threat-badge"); b.classList.remove("hidden"); clearTimeout(_badge); _badge = setTimeout(() => b.classList.add("hidden"), 4500); }
 
-/* ================= GRAPH EXPLORER — structured datapath layout ================= */
+/* ================= GRAPH EXPLORER — force-directed layout ================= */
 const GX_W = 1280, GX_H = 720;
-const GX_TOP = 96, GX_BOT = 64, GX_COL_HOST = 96, GX_COL_BURST0 = 300;
-const GX_MAX_BURSTS = 16;
-const GX_SPINE = ["burst_in", "burst_out", "periodic", "direction_change"];
 let gxZoom = 1, gxPanX = 0, gxPanY = 0;
 
 function applyGX() {
@@ -371,99 +368,109 @@ function applyGX() {
 function enterGraphScreen() {
   gxZoom = 1; gxPanX = 0; gxPanY = 0; applyGX();
   if (state.graphView) { drawGX(state.graphView); return; }
-  // no selection yet — focus the busiest host so the datapath stays readable
   const host = (state.activeAlertObj && state.activeAlertObj.src_host)
     || (state.alerts[0] && state.alerts[0].src_host);
   const url = host ? `/api/graph?host=${encodeURIComponent(host)}` : "/api/graph";
   j(url).then((v) => { state.graphView = v; drawGX(v); }).catch(() => {});
 }
 
-/* Assign every node an (x,y) on a left→right datapath:
-   host  ──emits──▶  ordered burst chain (t →)  ──resolves──▶  domain column   */
-function datapathLayout(view) {
-  const nodes = view.nodes || [], edges = view.edges || [];
+/* Force-directed layout: repulsion + edge springs + weak gravity → organic network */
+function forceLayout(view) {
+  const nodes = (view.nodes || []).map((n) => ({ ...n }));
+  const edges = view.edges || [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const hosts = nodes.filter((n) => n.type === "host");
-  const bursts = nodes.filter((n) => n.type === "burst");
-  const domains = nodes.filter((n) => n.type === "domain");
-  const alerts = nodes.filter((n) => n.type === "alert");
-  const colDom = GX_W - 150;
 
-  // order bursts along their forward sequence edges
-  const next = new Map();
-  edges.forEach((e) => {
-    if (byId.get(e.src)?.type === "burst" && byId.get(e.dst)?.type === "burst" && GX_SPINE.includes(e.rel) && !next.has(e.src))
-      next.set(e.src, e.dst);
-  });
-  const indeg = new Map(bursts.map((b) => [b.id, 0]));
-  next.forEach((d) => indeg.set(d, (indeg.get(d) || 0) + 1));
-  const ordered = [], seen = new Set();
-  bursts.filter((b) => (indeg.get(b.id) || 0) === 0).forEach((root) => {
-    let cur = root.id;
-    while (cur && !seen.has(cur)) { seen.add(cur); ordered.push(byId.get(cur)); cur = next.get(cur); }
-  });
-  bursts.forEach((b) => { if (!seen.has(b.id)) ordered.push(b); });
+  const CX = GX_W / 2, CY = GX_H / 2;
+  const PAD = 80;
 
-  // group into per-host lanes
-  const hostKey = (h) => h.attrs?.ip || h.id;
-  const laneKeys = hosts.length ? hosts.map(hostKey) : ["_"];
-  const lanes = new Map(laneKeys.map((k) => [k, []]));
-  ordered.forEach((b) => {
-    const k = b.attrs?.host && lanes.has(b.attrs.host) ? b.attrs.host : laneKeys[0];
-    lanes.get(k).push(b);
+  // Seed positions by type so the simulation starts in a reasonable state
+  const typeCounts = {}, typeIdx = {};
+  nodes.forEach((n) => { typeCounts[n.type] = (typeCounts[n.type] || 0) + 1; typeIdx[n.type] = 0; });
+  nodes.forEach((n) => {
+    const i = typeIdx[n.type]++, total = typeCounts[n.type];
+    const angle = (2 * Math.PI * i) / Math.max(1, total);
+    const radii = { host: 90, burst: 240, domain: 360, alert: 160 };
+    const r = radii[n.type] || 200;
+    // Spread angles so same-type nodes don't stack
+    const jitter = (n.type === "burst") ? (i % 3) * 35 : 0;
+    n.x = CX + Math.cos(angle) * (r + jitter);
+    n.y = CY + Math.sin(angle) * (r + jitter) * 0.72; // flatten vertically
+    n.vx = 0; n.vy = 0;
   });
 
-  const place = new Map();
-  const laneCount = Math.max(1, lanes.size);
-  const laneH = (GX_H - GX_TOP - GX_BOT) / laneCount;
-  const dense = laneCount > 3;
-  let li = 0, shownBursts = 0, totalBursts = bursts.length;
-  lanes.forEach((bs, key) => {
-    const cy = GX_TOP + laneH * (li + 0.5); li++;
-    const hNode = hosts.find((h) => hostKey(h) === key);
-    if (hNode) place.set(hNode.id, { x: GX_COL_HOST, y: cy });
-    const list = bs.slice(0, GX_MAX_BURSTS);
-    shownBursts += list.length;
-    const span = colDom - 120 - GX_COL_BURST0;
-    const tsArr = list.map(b => b.attrs?.start_ts || 0);
-    const tsMin = Math.min(...tsArr), tsMax = Math.max(...tsArr);
-    const tsSpan = tsMax > tsMin ? tsMax - tsMin : 0;
-    list.forEach((b, i) => {
-      let x;
-      if (list.length === 1) {
-        x = GX_COL_BURST0 + span * 0.4;
-      } else if (tsSpan > 0) {
-        const ts = b.attrs?.start_ts || tsMin;
-        x = GX_COL_BURST0 + span * 0.05 + span * 0.9 * ((ts - tsMin) / tsSpan);
-      } else {
-        x = GX_COL_BURST0 + span * (i / (list.length - 1));
+  // Spring parameters per edge type
+  const SPRING = {
+    emits:            { k: 0.05, len: 180 },
+    raised_on:        { k: 0.14, len: 52  },
+    resolves:         { k: 0.04, len: 155 },
+    periodic:         { k: 0.07, len: 115 },
+    burst_in:         { k: 0.07, len: 88  },
+    burst_out:        { k: 0.07, len: 88  },
+    direction_change: { k: 0.07, len: 88  },
+  };
+  const REPULSION = 4500, DAMPING = 0.82, GRAVITY = 0.0007;
+  const ITERS = 220;
+
+  for (let iter = 0; iter < ITERS; iter++) {
+    const alpha = Math.pow(1 - iter / ITERS, 0.55);
+
+    // Pairwise repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x || 0.1, dy = b.y - a.y || 0.1;
+        const d2 = dx * dx + dy * dy + 0.01;
+        const d = Math.sqrt(d2);
+        const f = (REPULSION * alpha) / d2;
+        const fx = f * dx / d, fy = f * dy / d;
+        if (a.type !== "host") { a.vx -= fx; a.vy -= fy; }
+        if (b.type !== "host") { b.vx += fx; b.vy += fy; }
       }
-      place.set(b.id, { x, y: cy });
+    }
+
+    // Edge springs
+    edges.forEach((e) => {
+      const a = byId.get(e.src), b = byId.get(e.dst);
+      if (!a || !b) return;
+      const sp = SPRING[e.rel] || { k: 0.04, len: 130 };
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = sp.k * (d - sp.len);
+      const fx = f * dx / d, fy = f * dy / d;
+      if (a.type !== "host") { a.vx += fx; a.vy += fy; }
+      if (b.type !== "host") { b.vx -= fx; b.vy -= fy; }
     });
+
+    // Weak gravity toward canvas center
+    nodes.forEach((n) => {
+      if (n.type === "host") return;
+      n.vx += (CX - n.x) * GRAVITY * alpha;
+      n.vy += (CY - n.y) * GRAVITY * alpha;
+    });
+
+    // Integrate positions
+    nodes.forEach((n) => {
+      if (n.type === "host") return; // hosts are pinned after seeding
+      n.vx *= DAMPING; n.vy *= DAMPING;
+      n.x = Math.max(PAD, Math.min(GX_W - PAD, n.x + n.vx));
+      n.y = Math.max(PAD, Math.min(GX_H - PAD, n.y + n.vy));
+    });
+  }
+
+  // Snap alert nodes directly above their correlated burst
+  nodes.forEach((n) => {
+    if (n.type !== "alert") return;
+    const on = edges.find((e) => e.src === n.id && e.rel === "raised_on");
+    const tgt = on && byId.get(on.dst);
+    if (tgt) { n.x = tgt.x; n.y = tgt.y - 50; }
   });
 
-  // domains: right column, y ≈ mean of the bursts that resolve to them, then de-overlap
-  const rows = domains.map((d) => {
-    const ys = edges.filter((e) => e.dst === d.id && e.rel === "resolves")
-      .map((e) => place.get(e.src)?.y).filter((v) => v != null);
-    return { d, y: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : GX_H / 2 };
-  }).sort((a, b) => a.y - b.y);
-  const gap = 30;
-  for (let i = 1; i < rows.length; i++) if (rows[i].y - rows[i - 1].y < gap) rows[i].y = rows[i - 1].y + gap;
-  const overflow = rows.length ? rows[rows.length - 1].y - (GX_H - GX_BOT) : 0;
-  rows.forEach((o) => place.set(o.d.id, { x: colDom, y: Math.max(GX_TOP, o.y - Math.max(0, overflow)) }));
-
-  alerts.forEach((al) => {
-    const on = edges.find((e) => e.src === al.id && e.rel === "raised_on");
-    const p = on && place.get(on.dst);
-    place.set(al.id, { x: p ? p.x : GX_COL_HOST, y: p ? p.y - 44 : GX_TOP });
-  });
-
-  nodes.forEach((n) => { const p = place.get(n.id); if (p) { n.x = p.x; n.y = p.y; } });
+  const bursts = nodes.filter((n) => n.type === "burst");
   return {
-    nodes: nodes.filter((n) => place.has(n.id)),
-    edges: edges.filter((e) => place.has(e.src) && place.has(e.dst)),
-    shownBursts, totalBursts, dense,
+    nodes,
+    edges: edges.filter((e) => byId.has(e.src) && byId.has(e.dst)),
+    shownBursts: bursts.length, totalBursts: bursts.length,
+    dense: nodes.length > 60,
   };
 }
 
@@ -499,16 +506,25 @@ const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n
 function drawGX(view) {
   const svg = $("#gx-svg");
   [...svg.querySelectorAll(":scope > *:not(defs)")].forEach((n) => n.remove());
-  const g = datapathLayout({ nodes: (view.nodes || []).map((n) => ({ ...n })), edges: view.edges || [] });
+  const g = forceLayout({ nodes: (view.nodes || []).map((n) => ({ ...n })), edges: view.edges || [] });
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
 
-  // column guide headers
-  [["HOST", GX_COL_HOST], ["TRAFFIC BURSTS   ( t → )", (GX_COL_BURST0 + GX_W - 150) / 2], ["RESOLVED DOMAINS", GX_W - 150]]
-    .forEach(([label, x]) => svg.appendChild(gxText(x, 40, label, "gx-head")));
-  if (g.totalBursts > g.shownBursts)
-    svg.appendChild(gxText((GX_COL_BURST0 + GX_W - 150) / 2, 60, `showing ${g.shownBursts} of ${g.totalBursts} bursts`, "gx-note"));
-  const statsLabel = `${g.nodes.length} nodes · ${g.edges.length} edges${g.totalBursts > g.shownBursts ? ` · ${g.totalBursts - g.shownBursts} bursts clipped` : ""}`;
-  svg.appendChild(gxText(GX_W / 2, GX_H - 14, statsLabel, "gx-note"));
+  // Legend (top-left)
+  const legendItems = [
+    ["HOST", "#00f2ff"], ["BURST", "#ffe173"], ["DOMAIN", "#c3a3ff"], ["ALERT", "#ffb4ab"],
+  ];
+  legendItems.forEach(([label, color], i) => {
+    const lx = 20, ly = 20 + i * 20;
+    const dot = document.createElementNS(SVGNS, "circle");
+    dot.setAttribute("cx", lx); dot.setAttribute("cy", ly - 4);
+    dot.setAttribute("r", "5"); dot.setAttribute("fill", color);
+    svg.appendChild(dot);
+    svg.appendChild(gxText(lx + 12, ly, label, "gx-note", "start"));
+  });
+
+  // Stats bar (bottom)
+  const statsLabel = `${g.nodes.length} nodes · ${g.edges.length} edges`;
+  svg.appendChild(gxText(GX_W / 2, GX_H - 10, statsLabel, "gx-note"));
 
   // edges (behind nodes)
   g.edges.forEach((e) => {

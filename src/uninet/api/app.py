@@ -28,10 +28,13 @@ from datetime import timedelta
 from threading import Timer
 
 from flask import Flask, Response, jsonify, render_template, request, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+from uninet.api.admin import bp as admin_bp
 from uninet.api.auth import bp as auth_bp
 from uninet.api.auth import is_authenticated, login_required
-from uninet.config import Settings, load_settings
+from uninet.api.user_store import UserStore
+from uninet.config import REPO_ROOT, Settings, load_settings
 from uninet.features.fingerprint import behavioural_fingerprint
 from uninet.streaming.worker import PipelineResult, run_pipeline
 
@@ -128,6 +131,7 @@ def create_app(result: PipelineResult | None = None, settings: Settings | None =
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.secret_key = settings.secret_key
     app.permanent_session_lifetime = timedelta(hours=12)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     if result is None:
         from uninet.ingestion.sources.synthetic import SyntheticSource
@@ -136,8 +140,10 @@ def create_app(result: PipelineResult | None = None, settings: Settings | None =
 
     app.config["SETTINGS"] = settings
     app.config["VERSION"] = 0
+    app.config["USER_STORE"] = UserStore(REPO_ROOT / "config" / "users.json")
     set_result(app, result)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
 
     # ---- Health check (public, no auth) -------------------------------- #
     @app.get("/health")
