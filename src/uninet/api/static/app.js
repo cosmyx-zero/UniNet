@@ -425,8 +425,19 @@ function datapathLayout(view) {
     const list = bs.slice(0, GX_MAX_BURSTS);
     shownBursts += list.length;
     const span = colDom - 120 - GX_COL_BURST0;
+    const tsArr = list.map(b => b.attrs?.start_ts || 0);
+    const tsMin = Math.min(...tsArr), tsMax = Math.max(...tsArr);
+    const tsSpan = tsMax > tsMin ? tsMax - tsMin : 0;
     list.forEach((b, i) => {
-      const x = list.length === 1 ? GX_COL_BURST0 + span * 0.4 : GX_COL_BURST0 + span * (i / (list.length - 1));
+      let x;
+      if (list.length === 1) {
+        x = GX_COL_BURST0 + span * 0.4;
+      } else if (tsSpan > 0) {
+        const ts = b.attrs?.start_ts || tsMin;
+        x = GX_COL_BURST0 + span * 0.05 + span * 0.9 * ((ts - tsMin) / tsSpan);
+      } else {
+        x = GX_COL_BURST0 + span * (i / (list.length - 1));
+      }
       place.set(b.id, { x, y: cy });
     });
   });
@@ -521,7 +532,7 @@ function drawGX(view) {
       grp.appendChild(halo);
     }
     const c = document.createElementNS(SVGNS, "circle");
-    const r = n.type === "host" ? 16 : n.type === "burst" ? 9 : n.type === "alert" ? 7 : 8;
+    const r = n.type === "host" ? 16 : n.type === "burst" ? Math.max(7, Math.min(18, 7 + Math.log10(+(a.byte_count || 1) + 1) * 2)) : n.type === "alert" ? 11 : 8;
     c.setAttribute("r", r);
     c.setAttribute("fill", n.type === "alert" ? "#ffb4ab" : NODE_COLOR[n.type] || "#889");
     c.setAttribute("filter", n.type === "burst" || n.type === "alert" ? "url(#gx-glow-burst)" : "url(#gx-glow)");
