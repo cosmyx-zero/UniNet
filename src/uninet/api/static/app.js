@@ -456,16 +456,22 @@ function datapathLayout(view) {
   };
 }
 
-function gxEdgePath(x1, y1, x2, y2) {
+function gxEdgePath(x1, y1, x2, y2, rel) {
+  if (rel === "raised_on") {
+    const midY = (y1 + y2) / 2;
+    return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+  }
   const mx = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
 }
 function styleGXEdge(p, rel) {
-  if (rel === "periodic") { p.setAttribute("stroke", "url(#gx-flow)"); p.setAttribute("stroke-width", "2.5"); p.setAttribute("stroke-dasharray", "9 6"); p.setAttribute("class", "edge-anim"); }
-  else if (rel === "direction_change") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "5 4"); p.setAttribute("stroke-opacity", ".9"); }
-  else if (rel === "burst_in" || rel === "burst_out") { p.setAttribute("stroke", "#00dbe7"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-opacity", ".55"); }
-  else if (rel === "resolves") { p.setAttribute("stroke", "#e8c423"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".55"); }
-  else if (rel === "emits") { p.setAttribute("stroke", "#849495"); p.setAttribute("stroke-width", "1"); p.setAttribute("stroke-opacity", ".28"); }
+  const arr = (id) => p.setAttribute("marker-end", `url(#${id})`);
+  if (rel === "periodic") { p.setAttribute("stroke", "url(#gx-flow)"); p.setAttribute("stroke-width", "2.5"); p.setAttribute("stroke-dasharray", "9 6"); p.setAttribute("class", "edge-anim"); arr("gx-arr-b"); }
+  else if (rel === "direction_change") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "5 4"); p.setAttribute("stroke-opacity", ".9"); arr("gx-arr-r"); }
+  else if (rel === "burst_in" || rel === "burst_out") { p.setAttribute("stroke", "#00dbe7"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-opacity", ".65"); arr("gx-arr-b"); }
+  else if (rel === "resolves") { p.setAttribute("stroke", "#e8c423"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".6"); arr("gx-arr-g"); }
+  else if (rel === "emits") { p.setAttribute("stroke", "#849495"); p.setAttribute("stroke-width", "1"); p.setAttribute("stroke-opacity", ".35"); arr("gx-arr-b"); }
+  else if (rel === "raised_on") { p.setAttribute("stroke", "#ffb4ab"); p.setAttribute("stroke-width", "2"); p.setAttribute("stroke-dasharray", "4 3"); p.setAttribute("stroke-opacity", ".9"); arr("gx-arr-r"); }
   else { p.setAttribute("stroke", "#3a494b"); p.setAttribute("stroke-width", "1.4"); p.setAttribute("stroke-opacity", ".7"); }
   p.setAttribute("fill", "none");
 }
@@ -495,7 +501,7 @@ function drawGX(view) {
   g.edges.forEach((e) => {
     const p = byId.get(e.src), q = byId.get(e.dst); if (!p || !q) return;
     const path = document.createElementNS(SVGNS, "path");
-    path.setAttribute("d", gxEdgePath(p.x, p.y, q.x, q.y));
+    path.setAttribute("d", gxEdgePath(p.x, p.y, q.x, q.y, e.rel));
     styleGXEdge(path, e.rel);
     svg.appendChild(path);
   });
