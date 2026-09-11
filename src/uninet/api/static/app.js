@@ -507,6 +507,8 @@ function drawGX(view) {
     .forEach(([label, x]) => svg.appendChild(gxText(x, 40, label, "gx-head")));
   if (g.totalBursts > g.shownBursts)
     svg.appendChild(gxText((GX_COL_BURST0 + GX_W - 150) / 2, 60, `showing ${g.shownBursts} of ${g.totalBursts} bursts`, "gx-note"));
+  const statsLabel = `${g.nodes.length} nodes · ${g.edges.length} edges${g.totalBursts > g.shownBursts ? ` · ${g.totalBursts - g.shownBursts} bursts clipped` : ""}`;
+  svg.appendChild(gxText(GX_W / 2, GX_H - 14, statsLabel, "gx-note"));
 
   // edges (behind nodes)
   g.edges.forEach((e) => {
@@ -563,12 +565,21 @@ function drawGX(view) {
       if (!g.dense) {
         grp.appendChild(gxText(0, r + 16, clip(a.peer || "burst", 20), "gx-lbl"));
         grp.appendChild(gxText(0, r + 28, `${(a.flow_count | 0)} fl · ${fmtBytes(a.byte_count)}`, "gx-sub"));
+      } else {
+        grp.appendChild(gxText(0, r + 13, clip(a.peer || "", 12), "gx-sub"));
       }
     } else if (n.type === "alert") {
       const alertLbl = a.threat_type ? clip(a.threat_type.replace(/_/g, " "), g.dense ? 12 : 18) : "ALERT";
       grp.appendChild(gxText(0, -r - 8, alertLbl, "gx-lbl gx-alert"));
     }
 
+    const ttl = document.createElementNS(SVGNS, "title");
+    ttl.textContent = n.type === "host" ? `Host: ${a.ip || n.id}`
+      : n.type === "burst" ? `${a.peer || n.id} · ${(a.flow_count | 0)} flows · ${fmtBytes(a.byte_count)}`
+      : n.type === "domain" ? `Domain: ${a.name || n.id}`
+      : n.type === "alert" ? `Alert: ${(a.threat_type || "").replace(/_/g, " ")} · ${a.severity || "?"}`
+      : n.id;
+    grp.appendChild(ttl);
     grp.addEventListener("click", (ev) => { ev.stopPropagation(); showGXMeta(n); });
     svg.appendChild(grp);
   });
@@ -757,7 +768,7 @@ $("#ws-open-ai").onclick = () => {
 
 /* graph explorer controls */
 $("#gx-zoom-in").onclick = () => { gxZoom = Math.min(5, gxZoom * 1.3); applyGX(); };
-$("#gx-zoom-out").onclick = () => { gxZoom = Math.max(0.4, gxZoom / 1.3); applyGX(); };
+$("#gx-zoom-out").onclick = () => { gxZoom = Math.max(0.25, gxZoom / 1.3); applyGX(); };
 $("#gx-center").onclick = () => { gxPanX = 0; gxPanY = 0; applyGX(); };
 $("#gx-reset").onclick = () => { gxZoom = 1; gxPanX = 0; gxPanY = 0; applyGX(); if (state.graphView) drawGX(state.graphView); };
 $("#gx-meta-close").onclick = () => $("#gx-meta").classList.add("translate-x-full");
@@ -785,6 +796,15 @@ $("#gx-trace").onclick = () => {
     applyGX();
   });
 })();
+
+/* mouse-wheel zoom — pinch to zoom on trackpads via deltaY */
+document.getElementById("gx-container").addEventListener("wheel", (ev) => {
+  if (state.screen !== "graph") return;
+  ev.preventDefault();
+  const factor = ev.deltaY > 0 ? 1.15 : 1 / 1.15;
+  gxZoom = Math.max(0.25, Math.min(5, gxZoom * factor));
+  applyGX();
+}, { passive: false });
 
 /* AI chat */
 $("#chat-send").onclick = () => chatSend();
