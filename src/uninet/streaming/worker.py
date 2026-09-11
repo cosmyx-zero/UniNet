@@ -7,6 +7,7 @@ fixed-width time windows.
 """
 from __future__ import annotations
 
+import bisect
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -95,10 +96,16 @@ def run_pipeline(
     t_end = flows[-1].start_ts
     win = float(s.window_seconds)
 
+    # Pre-extract timestamps so each window boundary search is O(log N)
+    # instead of the naive O(N) list comprehension.
+    timestamps = [f.start_ts for f in flows]
+
     ws = t0
     while ws <= t_end:
         we = ws + win
-        window_flows = [f for f in flows if ws <= f.start_ts < we]
+        lo = bisect.bisect_left(timestamps, ws)
+        hi = bisect.bisect_left(timestamps, we)
+        window_flows = flows[lo:hi]
         if window_flows:
             result.window_count += 1
             by_host: dict[str, list[FlowRecord]] = defaultdict(list)

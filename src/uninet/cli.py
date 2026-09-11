@@ -35,20 +35,22 @@ def _ensure_anomaly_model(settings, *, force: bool) -> None:
     print(f"· anomaly model ready -> {path}", flush=True)
 
 
-def _make_source(pcap: str | None, seed: int):
+def _make_source(pcap: str | None, seed: int, n_devices: int = 8):
     if pcap:
         from uninet.ingestion.sources.pcap import PcapSource
 
         return PcapSource(pcap)
     from uninet.ingestion.sources.synthetic import SyntheticSource
 
-    return SyntheticSource(seed=seed)
+    return SyntheticSource(seed=seed, n_devices=n_devices)
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="uninet", description="UniNet threat console")
     p.add_argument("--pcap", metavar="PATH")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--devices", type=int, default=8,
+                   help="number of simulated devices (min 8; scales synthetic traffic)")
     p.add_argument("--port", type=int)
     p.add_argument("--host")
     p.add_argument("--no-open", action="store_true")
@@ -74,22 +76,23 @@ def main(argv: list[str] | None = None) -> int:
     from uninet.api.app import create_app, serve, set_result
 
     # ---- initial detection pass ------------------------------------
+    n_dev = args.devices
     if args.workers > 1:
         from uninet.streaming.service import run_sharded
 
-        print(f"· Phase 5: sharded pipeline across {args.workers} {args.executor} workers …",
-              flush=True)
+        print(f"· Phase 5: sharded pipeline across {args.workers} {args.executor} workers "
+              f"({n_dev} devices) …", flush=True)
         result = run_sharded(
-            _make_source(args.pcap, args.seed), settings,
+            _make_source(args.pcap, args.seed, n_devices=n_dev), settings,
             workers=args.workers, executor=args.executor,
         )
     else:
         from uninet.detection.detector import Detector
         from uninet.streaming.worker import run_pipeline
 
-        print("· running detection pipeline …", flush=True)
+        print(f"· running detection pipeline ({n_dev} devices) …", flush=True)
         result = run_pipeline(
-            _make_source(args.pcap, args.seed), settings,
+            _make_source(args.pcap, args.seed, n_devices=n_dev), settings,
             detector=Detector.from_settings(settings),
         )
     print(
@@ -111,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def _factory():
             counter["n"] += 1
-            return SyntheticSource(seed=args.seed + counter["n"])
+            return SyntheticSource(seed=args.seed + counter["n"], n_devices=n_dev)
 
         live = LiveService(
             _factory, settings, interval=args.interval,

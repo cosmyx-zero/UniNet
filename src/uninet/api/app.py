@@ -56,7 +56,12 @@ def set_result(app: Flask, result: PipelineResult) -> None:
     """Swap in a fresh pipeline result (used by the live service)."""
     app.config["RESULT"] = result
     app.config["ALERTS_BY_ID"] = {a.alert_id: a for a in result.alerts}
-    app.config["HOSTS"] = _hosts_summary(result)
+    hosts = _hosts_summary(result)
+    app.config["HOSTS"] = hosts
+    # Only update DEVICE_COUNT on first load so the counter stays stable across
+    # live refreshes (which may use a different seed and slightly different count).
+    if "DEVICE_COUNT" not in app.config:
+        app.config["DEVICE_COUNT"] = len(hosts)
     version = app.config.get("VERSION", 0) + 1
     app.config["VERSION"] = version
     _publish_version(version)
@@ -180,6 +185,7 @@ def create_app(result: PipelineResult | None = None, settings: Settings | None =
         return jsonify(
             flows=r.flow_count, windows=r.window_count, graph=r.graph.stats(),
             alerts=len(r.alerts), hosts=len(app.config["HOSTS"]),
+            device_count=app.config.get("DEVICE_COUNT", len(app.config["HOSTS"])),
             by_severity=by_sev, by_threat=by_threat,
             version=app.config.get("VERSION", 0),
         )
@@ -217,7 +223,30 @@ def create_app(result: PipelineResult | None = None, settings: Settings | None =
     @app.get("/api/hosts")
     @login_required
     def hosts():
-        return jsonify(app.config["HOSTS"])
+        all_hosts = app.config["HOSTS"]
+        # Server-side text search (IP or threat type).
+        q = (request.args.get("q") or "").strip().lower()
+        if q:
+            all_hosts = [
+                h for h in all_hosts
+                if q in h["ip"].lower()
+                or (h.get("alert") and q in h["alert"]["threat"].lower())
+            ]
+        # Pagination: omitting ?page returns all rows (backward compat).
+        page_str = request.args.get("page")
+        if page_str is None:
+            return jsonify(all_hosts)
+        page = max(1, int(page_str))
+        per_page = min(max(1, int(request.args.get("per_page", 50))), 200)
+        total = len(all_hosts)
+        start = (page - 1) * per_page
+        return jsonify({
+            "items": all_hosts[start: start + per_page],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": max(1, (total + per_page - 1) // per_page),
+        })
 
     @app.get("/api/alerts")
     @login_required

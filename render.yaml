@@ -18,6 +18,12 @@ services:
       - key: UNINET_API_HOST
         value: "0.0.0.0"
 
+      - key: UNINET_DEVICES
+        value: "1000"
+
+      - key: UNINET_INTERVAL
+        value: "30"
+
       - key: UNINET_AUTH_USER
         sync: false
 
