@@ -151,9 +151,9 @@ pip install -e ".[dev]"     # pytest + ruff
 
 ## Documentation
 
+- [`working.md`](working.md) — end-to-end pipeline walkthrough and key concepts
+- [`usecases.md`](usecases.md) — analyst, threat-hunter, and platform-engineer workflows
 - [`docs/architecture.md`](docs/architecture.md) — pipeline and phase-5 scale-out detail
-- [`docs/working.md`](docs/working.md) — end-to-end pipeline walkthrough and key concepts
-- [`docs/usecases.md`](docs/usecases.md) — analyst, threat-hunter, and platform-engineer workflows
 - [`docs/alert-schema.md`](docs/alert-schema.md) — Alert JSON schema reference
 - [`docs/readonly-guarantee.md`](docs/readonly-guarantee.md) — sensor read-only contract
 
