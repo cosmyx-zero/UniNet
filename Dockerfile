@@ -16,4 +16,12 @@ RUN pip install --upgrade pip setuptools wheel && \
 
 COPY . .
 
-CMD sh -c 'uninet --host 0.0.0.0 --port ${PORT:-8000} --no-open'
+# Single gevent worker: app.config state is process-local and SSE subscribers
+# are greenlets in the same gevent hub, so one worker is both correct and safe.
+CMD sh -c 'gunicorn "uninet.wsgi:app" \
+    --worker-class gevent \
+    --workers 1 \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --timeout 120 \
+    --keep-alive 75 \
+    --log-level info'
